@@ -18,5 +18,9 @@
 # Boston, MA 02110-1301, USA.
 
 install(FILES
-    DESTINATION share/gnuradio/grc/blocks
+    xfdm_sync_sc_delay_corr.xml
+    xfdm_sync_sc_normalize_corr.xml
+    xfdm_sync_sc_tagger.xml
+    xfdm_sync_xcorr_tagger.xml
+    xfdm_sync_frame_gate.xml DESTINATION share/gnuradio/grc/blocks
 )

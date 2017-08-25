@@ -22,5 +22,9 @@
 ########################################################################
 install(FILES
     api.h
-    DESTINATION include/xfdm_sync
+    sc_delay_corr.h
+    sc_normalize_corr.h
+    sc_tagger.h
+    xcorr_tagger.h
+    frame_gate.h DESTINATION include/xfdm_sync
 )
