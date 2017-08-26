@@ -28,17 +28,17 @@ namespace gr {
 
     class xcorr_tagger_impl : public xcorr_tagger
     {
-     private:
-      // Nothing to declare in this block.
+    private:
+      std::unique_ptr<gr_complex[]> d_sequence_fq;
 
-     public:
+    public:
       xcorr_tagger_impl(sync_sequence);
       ~xcorr_tagger_impl();
 
       // Where all the action really happens
       int work(int noutput_items,
-         gr_vector_const_void_star &input_items,
-         gr_vector_void_star &output_items);
+               gr_vector_const_void_star &input_items,
+               gr_vector_void_star &output_items);
     };
 
   } // namespace xfdm_sync

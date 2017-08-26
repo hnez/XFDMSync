@@ -81,19 +81,19 @@ namespace gr {
 
           pmt_t info= pmt::make_dict();
           pmt::dict_add(info,
-                        pmt::mp("corr_power"),
+                        pmt::mp("sc_corr_power"),
                         pmt::from_double(corr_power));
 
           pmt::dict_add(info,
-                        pmt::mp("rot_per_sym"),
+                        pmt::mp("sc_rot"),
                         pmt::from_complex(rot_per_sym));
 
           pmt::dict_add(info,
-                        pmt::mp("peak_idx"),
+                        pmt::mp("sc_idx"),
                         pmt::from_uint64(d_peak_idx));
 
           add_item_tag(0, d_peak.abs_idx,
-                       pmt::mp("preamble"),
+                       pmt::mp("preamble_start"),
                        info);
 
           d_peak_idx++;
