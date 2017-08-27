@@ -24,5 +24,6 @@ GR_SWIG_BLOCK_MAGIC2(xfdm_sync, sc_normalize_corr);
 GR_SWIG_BLOCK_MAGIC2(xfdm_sync, sc_tagger);
 %include "xfdm_sync/xcorr_tagger.h"
 GR_SWIG_BLOCK_MAGIC2(xfdm_sync, xcorr_tagger);
+
 %include "xfdm_sync/frame_gate.h"
 GR_SWIG_BLOCK_MAGIC2(xfdm_sync, frame_gate);

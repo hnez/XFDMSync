@@ -23,7 +23,7 @@
 #define INCLUDED_XFDM_SYNC_FRAME_GATE_H
 
 #include <xfdm_sync/api.h>
-#include <gnuradio/sync_block.h>
+#include <gnuradio/block.h>
 
 namespace gr {
   namespace xfdm_sync {
@@ -33,7 +33,7 @@ namespace gr {
      * \ingroup xfdm_sync
      *
      */
-    class XFDM_SYNC_API frame_gate : virtual public gr::sync_block
+    class XFDM_SYNC_API frame_gate : virtual public gr::block
     {
      public:
       typedef boost::shared_ptr<frame_gate> sptr;
@@ -46,7 +46,7 @@ namespace gr {
        * class. xfdm_sync::frame_gate::make is the public interface for
        * creating new instances.
        */
-      static sptr make();
+      static sptr make(int len_prologue, int len_epilogue, int len_symbol, int symbols_per_frame_min, int symbols_per_frame_max, bool do_compensate);
     };
 
   } // namespace xfdm_sync

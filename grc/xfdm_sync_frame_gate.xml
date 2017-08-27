@@ -4,7 +4,7 @@
   <key>xfdm_sync_frame_gate</key>
   <category>[xfdm_sync]</category>
   <import>import xfdm_sync</import>
-  <make>xfdm_sync.frame_gate()</make>
+  <make>xfdm_sync.frame_gate($len_prologue, $len_epilogue, $len_symbol, $symbols_per_frame_min, $symbols_per_frame_max, $do_compensate)</make>
   <!-- Make one 'param' node for every Parameter you want settable from the GUI.
        Sub-nodes:
        * name

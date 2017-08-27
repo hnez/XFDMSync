@@ -24,14 +24,12 @@ include(GrPlatform) #define LIB_SUFFIX
 
 include_directories(${Boost_INCLUDE_DIR})
 link_directories(${Boost_LIBRARY_DIRS})
-
 list(APPEND xfdm_sync_sources
     sc_delay_corr_impl.cc
     sc_normalize_corr_impl.cc
     sc_tagger_impl.cc
     xcorr_tagger_impl.cc
-    frame_gate_impl.cc
-)
+    frame_gate_impl.cc )
 
 set(xfdm_sync_sources "${xfdm_sync_sources}" PARENT_SCOPE)
 if(NOT xfdm_sync_sources)
