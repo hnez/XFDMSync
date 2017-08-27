@@ -30,18 +30,25 @@ namespace gr {
   namespace xfdm_sync {
 
     xcorr_tagger::sptr
-    xcorr_tagger::make(float threshold, pmt_t sync_sequence)
+    xcorr_tagger::make(float threshold, pmt_t sync_sequence, bool use_sc_rot)
     {
-      return gnuradio::get_initial_sptr(new xcorr_tagger_impl(threshold, sync_sequence));
+      return gnuradio::get_initial_sptr(new xcorr_tagger_impl(threshold, sync_sequence, use_sc_rot));
     }
 
-    xcorr_tagger_impl::xcorr_tagger_impl(float threshold, pmt_t sync_sequence)
+    xcorr_tagger_impl::xcorr_tagger_impl(float threshold, pmt_t sync_sequence, bool use_sc_rot)
       : gr::sync_block("xcorr_tagger",
                        gr::io_signature::make(2, 2, sizeof(gr_complex)),
                        gr::io_signature::make(1, 1, sizeof(gr_complex)))
       d_threshold(threshold),
-      d_peak_idx(0)
+      d_peak_idx(0),
+      d_use_sc_rot(use_sc_rot)
     {
+      set_tag_propagation_policy(TPP_DONT);
+
+      if(!pmt::is_c32vector(sync_sequence)) {
+        throw std::runtime_error("xcorr_tagger: sync_sequence is expected to be a "\
+                                 "vector of complex numbers");
+      }
 
       int seq_len= pmt::length(sync_sequence);
 
@@ -63,6 +70,8 @@ namespace gr {
       /* Transform the referece sequence to the frequency
        * domain for fast crosscorrelation later */
       memset(fwd_in, 0, sizeof(gr_complex) * d_fft_len);
+
+      gr_complex *sequence= pmt::pmt_c32vector_elements(sync_sequence).data();
       memcpy(fwd_in, sequence, sizeof(gr_complex) * seq_len);
 
       d_fft_fwd.execute();
@@ -100,21 +109,46 @@ namespace gr {
       for(tag_t tag: tags) {
         int64_t tag_center= (int64_t)tag.offset - (int64_t)nitems_read(0);
 
+        pmt_t info= tag.value;
+
         gr_complex *fwd_in= d_fft_fwd.get_inbuf();
         gr_complex *fwd_out= d_fft_fwd.get_outbuf();
         gr_complex *rwd_in= d_fft_rwd.get_inbuf();
         gr_complex *rwd_out= d_fft_rwd.get_outbuf();
         gr_complex *seq_fqd= d_sequence_fq.get();
 
-        // Fill positive time
-        memcpy(&fwd_in[0],
-               &in_pass[tag_center],
-               sizeof(gr_complex) * d_fft_len/4);
+
+        /* Apply frequency offset correction based on input
+         * from the sc_tagger block */
+        gr_complex fq_comp_rot= 1;
+
+        if(d_use_sc_rot) {
+          pmt_t sc_rot= pmt::dict_ref(info,
+                                      pmt::mp("sc_rot"),
+                                      PMT_NIL);
+
+          if(pmt::is_complex(sc_rot)) {
+            fq_comp_rot= std::conj(pmt::to_complex(sc_rot));
+            fq_comp_rot/= std::abs(fq_comp_rot);
+          }
+        }
+
+        gr_complex fq_comp_acc= std::pow(fq_comp_rot(), -d_fft_len/2.0f);
+        fq_comp_acc/= std::abs(fq_comp_acc);
 
         // Fill negative time
-        memcpy(&fwd_in[d_fft_len - d_fft_len/4],
-               &in_pass[tag_center - d_fft_len/4],
-               sizeof(gr_complex) * d_fft_len/4);
+        volk_32fc_s32fc_x2_rotator_32fc(&fwd_in[d_fft_len - d_fft_len/4],
+                                        &in_pass[tag_center - d_fft_len/4],
+                                        fq_comp_rot,
+                                        &fq_comp_acc,
+                                        d_fft_len/4);
+
+        // Fill positive time
+        volk_32fc_s32fc_x2_rotator_32fc(&fwd_in[0],
+                                        &in_pass[tag_center],
+                                        fq_comp_rot,
+                                        &fq_comp_acc,
+                                        d_fft_len/4);
 
         d_fft_fwd.execute();
 
@@ -137,6 +171,7 @@ namespace gr {
                                              &rwd_out[0],
                                              &in_corr[tag_center],
                                              d_fft_len/4);
+
         // Fill negative time
         volk_32fc_x2_multiply_conjugate_32fc(&rwd_out[d_fft_len/2 - d_fft_len/4],
                                              &rwd_out[d_fft_len - d_fft_len/4],
@@ -155,8 +190,6 @@ namespace gr {
         peak_idx_rel-= d_fft_len/4;
 
         if(power > d_threshold) {
-          pmt_t info= tag.value;
-
           pmt::dict_add(info,
                         pmt::mp("xcorr_power"),
                         pmt::from_double(power));
