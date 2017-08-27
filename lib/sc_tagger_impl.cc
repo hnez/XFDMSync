@@ -75,11 +75,11 @@ namespace gr {
         if(d_peak.am_inside && (power_sq < d_thres_low_sq)) {
           d_peak.am_inside= false;
 
-          float corr_power= std::sqrt(d_peak.corr_pw_s);
-          gr_complex rot_per_sym= std::pow(d_peak.corr, 1.0f / seq_len);
+          float corr_power= std::sqrt(d_peak.corr_pw_sq);
+          gr_complex rot_per_sym= std::pow(d_peak.corr, 1.0f / d_seq_len);
           rot_per_sym/= std::abs(rot_per_sym);
 
-          pmt_t info= pmt::make_dict();
+          pmt::pmt_t info= pmt::make_dict();
           pmt::dict_add(info,
                         pmt::mp("sc_corr_power"),
                         pmt::from_double(corr_power));
@@ -106,7 +106,7 @@ namespace gr {
         }
 
         if(d_peak.am_inside && (d_peak.corr_pw_sq < power_sq)) {
-          d_peak.abs_idx= nitems_read(0) + io_idx + history();
+          d_peak.abs_idx= nitems_read(0) + hist_idx + history();
           d_peak.corr= corr;
           d_peak.corr_pw_sq= power_sq;
         }

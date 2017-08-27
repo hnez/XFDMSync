@@ -31,7 +31,7 @@ namespace gr {
     private:
       float d_thres_low_sq;
       float d_thres_high_sq;
-      int d_delay;
+      int d_seq_len;
 
       uint64_t d_peak_idx;
 
@@ -43,7 +43,7 @@ namespace gr {
       } d_peak;
 
     public:
-      sc_tagger_impl(float thres_low, float thres_high, int delay);
+      sc_tagger_impl(float thres_low, float thres_high, int seq_len);
       ~sc_tagger_impl();
 
       // Where all the action really happens

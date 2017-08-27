@@ -67,7 +67,7 @@ namespace gr {
 
       /* Pre-heat window and accumulator with history-values */
       for(int io_idx= -d_win_len; io_idx < 0; io_idx++) {
-        float power= std::norm(in[io_idx]);
+        float power= std::norm(in_ref[io_idx]);
 
         acc+= power;
         window[win_idx]= power;
@@ -76,15 +76,15 @@ namespace gr {
       }
 
       for(int io_idx= 0; io_idx < noutput_items; io_idx++) {
-        float power= std::norm(in[io_idx]);
+        float power= std::norm(in_ref[io_idx]);
 
         acc-= window[win_idx];
         acc+= power;
         window[win_idx]= power;
 
-        out[io_idx]= in[io_idx] / acc;
+        out[io_idx]= in_corr[io_idx] / acc;
 
-        win_idx= (win_idx + 1) % d_seq_len;
+        win_idx= (win_idx + 1) % d_win_len;
       }
 
       return noutput_items;

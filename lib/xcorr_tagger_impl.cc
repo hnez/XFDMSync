@@ -22,7 +22,8 @@
 #include "config.h"
 #endif
 
-#include <gnuradio/fft.h>
+#include <volk/volk.h>
+#include <gnuradio/fft/fft.h>
 #include <gnuradio/io_signature.h>
 #include "xcorr_tagger_impl.h"
 
@@ -30,15 +31,15 @@ namespace gr {
   namespace xfdm_sync {
 
     xcorr_tagger::sptr
-    xcorr_tagger::make(float threshold, pmt_t sync_sequence, bool use_sc_rot)
+    xcorr_tagger::make(float threshold, pmt::pmt_t sync_sequence, bool use_sc_rot)
     {
       return gnuradio::get_initial_sptr(new xcorr_tagger_impl(threshold, sync_sequence, use_sc_rot));
     }
 
-    xcorr_tagger_impl::xcorr_tagger_impl(float threshold, pmt_t sync_sequence, bool use_sc_rot)
+    xcorr_tagger_impl::xcorr_tagger_impl(float threshold, pmt::pmt_t sync_sequence, bool use_sc_rot)
       : gr::sync_block("xcorr_tagger",
                        gr::io_signature::make(2, 2, sizeof(gr_complex)),
-                       gr::io_signature::make(1, 1, sizeof(gr_complex)))
+                       gr::io_signature::make(1, 1, sizeof(gr_complex))),
       d_threshold(threshold),
       d_peak_idx(0),
       d_use_sc_rot(use_sc_rot)
@@ -61,22 +62,23 @@ namespace gr {
       d_sequence_fq= new gr_complex[d_fft_len];
 
       /* Let the GNURadio wrapper setup some fftw contexts */
-      gr::fft::fft_complex d_fft_fwd(d_fft_len, true, 1);
-      gr::fft::fft_complex d_fft_rwd(d_fft_len, false, 1);
 
-      gr_complex *fwd_in= d_fft_fwd.get_inbuf();
-      gr_complex *fwd_out= d_fft_fwd.get_outbuf();
+      d_fft_fwd= new gr::fft::fft_complex(d_fft_len, true, 1);
+      d_fft_rwd= new gr::fft::fft_complex(d_fft_len, false, 1);
+
+      gr_complex *fwd_in= d_fft_fwd->get_inbuf();
+      gr_complex *fwd_out= d_fft_fwd->get_outbuf();
 
       /* Transform the referece sequence to the frequency
        * domain for fast crosscorrelation later */
       memset(fwd_in, 0, sizeof(gr_complex) * d_fft_len);
+      for(int i=0; i<seq_len; i++) {
+        fwd_in[i]= pmt::c32vector_ref(sync_sequence, i);
+      }
 
-      gr_complex *sequence= pmt::pmt_c32vector_elements(sync_sequence).data();
-      memcpy(fwd_in, sequence, sizeof(gr_complex) * seq_len);
+      d_fft_fwd->execute();
 
-      d_fft_fwd.execute();
-
-      memcpy(d_sequence_fq.get(), fwd_out, sizeof(gr_complex) * d_fft_len);
+      memcpy(d_sequence_fq, fwd_out, sizeof(gr_complex) * d_fft_len);
 
       /* Clear the input buffer.
        * It will be assumed to be zeroed later */
@@ -85,6 +87,10 @@ namespace gr {
 
     xcorr_tagger_impl::~xcorr_tagger_impl()
     {
+      delete d_fft_fwd;
+      delete d_fft_fwd;
+
+      delete[] d_sequence_fq;
     }
 
     int
@@ -109,23 +115,21 @@ namespace gr {
       for(tag_t tag: tags) {
         int64_t tag_center= (int64_t)tag.offset - (int64_t)nitems_read(0);
 
-        pmt_t info= tag.value;
+        pmt::pmt_t info= tag.value;
 
-        gr_complex *fwd_in= d_fft_fwd.get_inbuf();
-        gr_complex *fwd_out= d_fft_fwd.get_outbuf();
-        gr_complex *rwd_in= d_fft_rwd.get_inbuf();
-        gr_complex *rwd_out= d_fft_rwd.get_outbuf();
-        gr_complex *seq_fqd= d_sequence_fq.get();
-
+        gr_complex *fwd_in= d_fft_fwd->get_inbuf();
+        gr_complex *fwd_out= d_fft_fwd->get_outbuf();
+        gr_complex *rwd_in= d_fft_rwd->get_inbuf();
+        gr_complex *rwd_out= d_fft_rwd->get_outbuf();
 
         /* Apply frequency offset correction based on input
          * from the sc_tagger block */
         gr_complex fq_comp_rot= 1;
 
         if(d_use_sc_rot) {
-          pmt_t sc_rot= pmt::dict_ref(info,
-                                      pmt::mp("sc_rot"),
-                                      PMT_NIL);
+          pmt::pmt_t sc_rot= pmt::dict_ref(info,
+                                           pmt::mp("sc_rot"),
+                                           pmt::PMT_NIL);
 
           if(pmt::is_complex(sc_rot)) {
             fq_comp_rot= std::conj(pmt::to_complex(sc_rot));
@@ -133,7 +137,7 @@ namespace gr {
           }
         }
 
-        gr_complex fq_comp_acc= std::pow(fq_comp_rot(), -d_fft_len/2.0f);
+        gr_complex fq_comp_acc= std::pow(fq_comp_rot, -d_fft_len/2.0f);
         fq_comp_acc/= std::abs(fq_comp_acc);
 
         // Fill negative time
@@ -150,13 +154,13 @@ namespace gr {
                                         &fq_comp_acc,
                                         d_fft_len/4);
 
-        d_fft_fwd.execute();
+        d_fft_fwd->execute();
 
         // Fill reverse fft buffer
         volk_32fc_x2_multiply_conjugate_32fc(rwd_in, fwd_out,
-                                             seq_fqd, d_fft_len);
+                                             d_sequence_fq, d_fft_len);
 
-        d_fft_rwd.execute();
+        d_fft_rwd->execute();
 
         /* Use the correlation input to mask the
          * wrong cross-correlation peaks.
@@ -180,7 +184,7 @@ namespace gr {
 
         // Locate the maximum
         int32_t peak_idx_rel;
-        volk_32fc_index_max_16u((uint32_t *) &peak_idx_rel,
+        volk_32fc_index_max_32u((uint32_t *) &peak_idx_rel,
                                 &rwd_out[d_fft_len/2 - d_fft_len/4],
                                 d_fft_len/2);
 

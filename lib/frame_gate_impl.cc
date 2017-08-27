@@ -22,6 +22,7 @@
 #include "config.h"
 #endif
 
+#include <volk/volk.h>
 #include <gnuradio/io_signature.h>
 #include "frame_gate_impl.h"
 
@@ -44,20 +45,30 @@ namespace gr {
                                      bool do_compensate)
       : gr::block("frame_gate",
                   gr::io_signature::make(1, 1, sizeof(gr_complex)),
-                  gr::io_signature::make(1, 1, sizeof(gr_complex))),
-      d_frame({.state= FS_NOFRAME}),
-      d_parameters({len_prologue, len_epilogue, len_symbol,
-            symbols_per_frame_min, symbols_per_frame_max,
-            do_compensate})
+                  gr::io_signature::make(1, 1, sizeof(gr_complex)))
     {
-      pmt_t mpid= pmt::mp("frame_hint");
+      /* We actually only want to block the
+       * preamble_start tag */
+      set_tag_propagation_policy(TPP_DONT);
 
+      /* Register feedback port */
+      pmt::pmt_t mpid= pmt::mp("frame_hint");
       message_port_register_in(mpid);
-
       set_msg_handler(mpid,
                       boost::bind(&frame_gate_impl::on_frame_hint, this, _1));
 
-      set_tag_propagation_policy(TPP_DONT);
+      /* initialize attributes */
+      d_frame.id= 0;
+      d_frame.active= false;
+
+      d_parameters.len_prologue= len_prologue;
+      d_parameters.len_epilogue= len_epilogue;
+      d_parameters.len_symbol= len_symbol;
+
+      d_parameters.symbols_per_frame_max= symbols_per_frame_max;
+      d_parameters.symbols_per_frame_min= symbols_per_frame_min;
+
+      d_parameters.do_compensate= do_compensate;
     }
 
     frame_gate_impl::~frame_gate_impl()
@@ -65,16 +76,16 @@ namespace gr {
     }
 
     void
-    frame_gate_impl::on_frame_hint(pmt_t msg)
+    frame_gate_impl::on_frame_hint(pmt::pmt_t msg)
     {
       if(!pmt::is_tuple(msg) || (pmt::length(msg) != 3)) {
         GR_LOG_WARN(LOG, "frame_gate: frame_hint was not formatted correctly\n");
         return;
       }
 
-      pmt_t operation= pmt::tuple_ref(msg, 0);
-      pmt_t frame_id= pmt::tuple_ref(msg, 1);
-      pmt_t data= pmt::tuple_ref(msg, 2);
+      pmt::pmt_t operation= pmt::tuple_ref(msg, 0);
+      pmt::pmt_t frame_id= pmt::tuple_ref(msg, 1);
+      pmt::pmt_t data= pmt::tuple_ref(msg, 2);
 
       /* Early out if the frame is already gone */
       if(!pmt::equal(frame_id, pmt::from_uint64(d_frame.id))) {
@@ -83,36 +94,34 @@ namespace gr {
 
       int len_pe= d_parameters.len_prologue + d_parameters.len_epilogue;
 
+      bool set_max= false;
+      bool set_min= false;
+
       /* Tell how many symbols it should output at most.
        * Keep in mind that when the message is received
        * the block might already have produced more output symbols.
        * The block may still produce fewer symbols when a new
        * start of frame tag is received. */
-      if(pmt::equal(operation, pmt::mp("max_symbols"))) {
-        int symbols= pmt::to_long(data);
-        int samples= len_pe + d_parameters.len_symbol * symbols
-
-        d_frame.samples_max= samples;
-      }
+      if(pmt::equal(operation, pmt::mp("max_symbols"))) set_max= true;
 
       /* Tell the block how many symbols to output at least.
        * This will prevent the detection of new frames until
        * this many symbols were read. */
-      if(pmt::equal(operation, pmt::mp("min_symbols"))) {
-        int symbols= pmt::to_long(data);
-        int samples= len_pe + d_parameters.len_symbol * symbols
-
-        d_frame.samples_min= samples;
-      }
+      if(pmt::equal(operation, pmt::mp("min_symbols"))) set_min= true;
 
       /* Tell the block to ready exactly this number of symbols.
        * Use this operation whenever possible. */
       if(pmt::equal(operation, pmt::mp("num_symbols"))) {
-        int symbols= pmt::to_long(data);
-        int samples= len_pe + d_parameters.len_symbol * symbols
+        set_max= true;
+        set_min= true;
+      }
 
-        d_frame.samples_min= samples;
-        d_frame.samples_max= samples;
+      if(set_max || set_min) {
+        int symbols= pmt::to_long(data);
+        int samples= len_pe + d_parameters.len_symbol * symbols;
+
+        if(set_max) d_frame.samples_max= samples;
+        if(set_min) d_frame.samples_max= samples;
       }
     }
 
@@ -140,7 +149,7 @@ namespace gr {
       int out_idx= 0;
 
       while((in_idx < in_len) && (out_idx < out_len)) {
-        const int len_pe= len_prologue + len_epilogue;
+        const int len_pe= d_parameters.len_prologue + d_parameters.len_epilogue;
 
         /* This stores the current estimate of the remaining
          * frame length in samples relative to in_idx.
@@ -158,7 +167,7 @@ namespace gr {
          * and make sure the frame ends before any one of them */
         for(tag_t tag: tags) {
           if(tag.offset >= nitems_read(0) + in_idx) {
-            frame_end= std::min(frame_end, tag.offset - nitems_read(0) - in_idx);
+            frame_end= std::min(frame_end, (int)(tag.offset - nitems_read(0)) - in_idx);
           }
         }
 
@@ -227,7 +236,7 @@ namespace gr {
            * This should be the case if frame_end was set based on a tag */
           for(tag_t tag: tags) {
             if(tag.offset == nitems_read(0) + in_idx) {
-              pmt_t info= tag.value;
+              pmt::pmt_t info= tag.value;
 
               d_frame.active= true;
               d_frame.samples_consumed= 0;
@@ -242,31 +251,31 @@ namespace gr {
                 d_frame.samples_min= len_pe + d_parameters.symbols_per_frame_min * d_parameters.len_symbol;
               }
 
-              fq_comp_acc= 1;
-              fq_comp_rot= 1;
+              d_frame.fq_comp_acc= 1;
+              d_frame.fq_comp_rot= 1;
 
               if(d_parameters.do_compensate) {
                 /* If the sc_tagger set the sc_rot field
                  * use it to compensate frequency offsets */
-                pmt_t rot= pmt::dict_ref(info,
-                                         pmt::mp("sc_rot"),
-                                         PMT_NIL);
+                pmt::pmt_t rot= pmt::dict_ref(info,
+                                              pmt::mp("sc_rot"),
+                                              pmt::PMT_NIL);
 
                 if(pmt::is_complex(rot)) {
-                  fq_comp_rot= std::conj(pmt::to_complex(rot));
-                  fq_comp_rot/= std::abs(fq_comp_rot);
+                  d_frame.fq_comp_rot= std::conj(pmt::to_complex(rot));
+                  d_frame.fq_comp_rot/= std::abs(d_frame.fq_comp_rot);
                 }
 
                 /* If the xcorr_tagger set the xcorr_rot field
                  * use it to set the start phase based on the preamble phase difference.
                  * This is a kind of poor-man's channel estimation */
-                pmt_t phase= pmt::dict_ref(info,
-                                           pmt::mp("xcorr_rot"),
-                                           PMT_NIL);
+                pmt::pmt_t phase= pmt::dict_ref(info,
+                                                pmt::mp("xcorr_rot"),
+                                                pmt::PMT_NIL);
 
                 if(pmt::is_complex(phase)) {
-                  fq_comp_acc= std::conj(pmt::to_complex(phase));
-                  fq_comp_acc/= std::abs(fq_comp_acc);
+                  d_frame.fq_comp_acc= std::conj(pmt::to_complex(phase));
+                  d_frame.fq_comp_acc/= std::abs(d_frame.fq_comp_acc);
                 }
               }
 

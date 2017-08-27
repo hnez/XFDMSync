@@ -35,7 +35,7 @@ namespace gr {
      */
     class XFDM_SYNC_API sc_tagger : virtual public gr::sync_block
     {
-     public:
+    public:
       typedef boost::shared_ptr<sc_tagger> sptr;
 
       /*!
@@ -46,7 +46,7 @@ namespace gr {
        * class. xfdm_sync::sc_tagger::make is the public interface for
        * creating new instances.
        */
-      static sptr make(bool fq_correct= false);
+      static sptr make(float thres_low, float thres_high, int seq_len);
     };
 
   } // namespace xfdm_sync
