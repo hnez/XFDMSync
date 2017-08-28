@@ -40,7 +40,7 @@ namespace gr {
       gr::fft::fft_complex *d_fft_rwd;
 
     public:
-      xcorr_tagger_impl(float threshold, pmt::pmt_t sync_sequence, bool use_sc_rot);
+      xcorr_tagger_impl(float threshold, std::vector<gr_complex> sync_sequence, bool use_sc_rot);
       ~xcorr_tagger_impl();
 
       int work(int noutput_items,

@@ -46,10 +46,9 @@ namespace gr {
        * class. xfdm_sync::xcorr_tagger::make is the public interface for
        * creating new instances.
        */
-      static sptr make(float threshold, pmt::pmt_t sync_sequence, bool use_sc_rot);
+      static sptr make(float threshold, std::vector<gr_complex> sync_sequence, bool use_sc_rot);
     };
+  }
+}
 
-  } // namespace xfdm_sync
-} // namespace gr
-
-#endif /* INCLUDED_XFDM_SYNC_XCORR_TAGGER_H */
+#endif

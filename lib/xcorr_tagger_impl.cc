@@ -31,12 +31,12 @@ namespace gr {
   namespace xfdm_sync {
 
     xcorr_tagger::sptr
-    xcorr_tagger::make(float threshold, pmt::pmt_t sync_sequence, bool use_sc_rot)
+    xcorr_tagger::make(float threshold, std::vector<gr_complex> sync_sequence, bool use_sc_rot)
     {
       return gnuradio::get_initial_sptr(new xcorr_tagger_impl(threshold, sync_sequence, use_sc_rot));
     }
 
-    xcorr_tagger_impl::xcorr_tagger_impl(float threshold, pmt::pmt_t sync_sequence, bool use_sc_rot)
+    xcorr_tagger_impl::xcorr_tagger_impl(float threshold, std::vector<gr_complex> sync_sequence, bool use_sc_rot)
       : gr::sync_block("xcorr_tagger",
                        gr::io_signature::make(2, 2, sizeof(gr_complex)),
                        gr::io_signature::make(2, 2, sizeof(gr_complex))),
@@ -46,12 +46,7 @@ namespace gr {
     {
       set_tag_propagation_policy(TPP_DONT);
 
-      if(!pmt::is_c32vector(sync_sequence)) {
-        throw std::runtime_error("xcorr_tagger: sync_sequence is expected to be a "\
-                                 "vector of complex numbers");
-      }
-
-      int seq_len= pmt::length(sync_sequence);
+      int seq_len= sync_sequence.size();
 
       /* Find a power-of-two fft length that can fit
        * the synchronization pattern, an equally sized
@@ -77,7 +72,7 @@ namespace gr {
        * domain for fast crosscorrelation later */
       memset(fwd_in, 0, sizeof(gr_complex) * d_fft_len);
       for(int i=0; i<seq_len; i++) {
-        fwd_in[i]= pmt::c32vector_ref(sync_sequence, i);
+        fwd_in[i]= sync_sequence[i];
       }
 
       d_fft_fwd->execute();
