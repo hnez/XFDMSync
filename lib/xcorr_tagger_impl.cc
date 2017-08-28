@@ -121,7 +121,8 @@ namespace gr {
                          tag_reg_start, tag_reg_end,
                          pmt::mp("preamble_start"));
 
-      printf("Tags between %ld and %ld: %ld\n", tag_reg_start, tag_reg_end, tags.size());
+      printf("xcorr_tagger: nitems_read(0)= %ld\n", nitems_read(0));
+      printf("xcorr_tagger: Tags between %ld and %ld: %ld\n", tag_reg_start, tag_reg_end, tags.size());
 
       for(tag_t tag: tags) {
         int tag_center= (int64_t)(tag.offset - nitems_read(0)) - d_fft_len/2;
