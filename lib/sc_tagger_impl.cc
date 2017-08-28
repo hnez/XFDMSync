@@ -95,8 +95,6 @@ namespace gr {
                               pmt::mp("sc_idx"),
                               pmt::from_uint64(d_peak.id));
 
-          printf("sc_tagger: add tag @%ld\n", d_peak.abs_idx);
-          
           add_item_tag(0, d_peak.abs_idx,
                        pmt::mp("preamble_start"),
                        info);
