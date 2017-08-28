@@ -29,16 +29,17 @@ namespace gr {
   namespace xfdm_sync {
 
     sc_delay_corr::sptr
-    sc_delay_corr::make(int seq_len)
+    sc_delay_corr::make(int seq_len, bool normalize)
     {
-      return gnuradio::get_initial_sptr(new sc_delay_corr_impl(seq_len));
+      return gnuradio::get_initial_sptr(new sc_delay_corr_impl(seq_len, normalize));
     }
 
-    sc_delay_corr_impl::sc_delay_corr_impl(int seq_len)
+    sc_delay_corr_impl::sc_delay_corr_impl(int seq_len, bool normalize)
       : gr::sync_block("sc_delay_corr",
                        gr::io_signature::make(1, 1, sizeof(gr_complex)),
-                       gr::io_signature::make(1, 1, sizeof(gr_complex))),
-      d_seq_len(seq_len)
+                       gr::io_signature::make(2, 2, sizeof(gr_complex))),
+      d_seq_len(seq_len),
+      d_normalize(normalize)
     {
       set_history(2 * seq_len);
     }
@@ -53,36 +54,60 @@ namespace gr {
                              gr_vector_void_star &output_items)
     {
       const gr_complex *in_history = (const gr_complex *) input_items[0];
-      gr_complex *out = (gr_complex *) output_items[0];
+      gr_complex *out_pass = (gr_complex *) output_items[0];
+      gr_complex *out_corr = (gr_complex *) output_items[1];
 
       /* Elements in the history will be referred to
        * using negative indices */
       const gr_complex *in= &in_history[history()];
 
-      int win_idx=0;
-      gr_complex window[d_seq_len] = {0};
-      gr_complex acc= 0;
+      int corr_win_len= d_seq_len;
+      int corr_win_idx= 0;
+      gr_complex corr_window[corr_win_len]= {0};
+      gr_complex corr_acc= 0;
 
-      /* Pre-heat window and accumulator with history-values */
-      for(int io_idx= -d_seq_len; io_idx < 0; io_idx++) {
-        gr_complex conjmul= in[io_idx] * std::conj(in[io_idx - d_seq_len]);
+      int norm_win_len= 2*d_seq_len;
+      int norm_win_idx= 0;
+      float norm_window[norm_win_len]= {0};
+      float norm_acc= 0;
 
-        acc+= conjmul;
-        window[win_idx]= conjmul;
+      /* Pre-heat corr_window and corr_acc with history-values */
+      for(int io_idx= -corr_win_len; io_idx < 0; io_idx++) {
+        gr_complex conjmul= in[io_idx] * std::conj(in[io_idx - corr_win_len]);
 
-        win_idx= (win_idx + 1) % d_seq_len;
+        corr_acc+= conjmul;
+        corr_window[corr_win_idx]= conjmul;
+
+        corr_win_idx= (corr_win_idx + 1) % corr_win_len;
+      }
+
+      /* Pre-heat norm_window and norm_acc with history-values */
+      for(int io_idx= -norm_win_len; io_idx < 0; io_idx++) {
+        gr_complex power= std::norm(in[io_idx]);
+
+        norm_acc+= power;
+        norm_window[norm_win_idx]= power;
+
+        norm_win_idx= (norm_win_idx + 1) % norm_win_len;
       }
 
       for(int io_idx= 0; io_idx < noutput_items; io_idx++) {
-        gr_complex conjmul= in[io_idx] * std::conj(in[io_idx - d_seq_len]);
+        gr_complex conjmul= in[io_idx] * std::conj(in[io_idx - corr_win_len]);
+        gr_complex power= std::norm(in[io_idx]);
 
-        acc-= window[win_idx];
-        acc+= conjmul;
-        window[win_idx]= conjmul;
+        corr_acc-= corr_window[corr_win_idx];
+        corr_window[corr_win_idx]= conjmul;
+        corr_acc+= conjmul;
 
-        out[io_idx]= acc;
+        norm_acc-= norm_window[norm_win_idx];
+        norm_window[norm_win_idx]= power;
+        norm_acc+= power;
 
-        win_idx= (win_idx + 1) % d_seq_len;
+        out_corr[io_idx]= d_normalize ? (2 * corr_acc / norm_acc) : corr_acc;
+        out_pass[io_idx]= in[io_idx];
+
+        corr_win_idx= (corr_win_idx + 1) % corr_win_len;
+        norm_win_idx= (norm_win_idx + 1) % norm_win_len;
       }
 
       return noutput_items;

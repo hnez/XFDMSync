@@ -30,18 +30,17 @@ namespace gr {
     {
     private:
       int d_seq_len;
+      bool d_normalize;
 
     public:
-      sc_delay_corr_impl(int seq_len);
+      sc_delay_corr_impl(int seq_len, bool normalize);
       ~sc_delay_corr_impl();
 
-      // Where all the action really happens
       int work(int noutput_items,
                gr_vector_const_void_star &input_items,
                gr_vector_void_star &output_items);
     };
+  }
+}
 
-  } // namespace xfdm_sync
-} // namespace gr
-
-#endif /* INCLUDED_XFDM_SYNC_SC_DELAY_CORR_IMPL_H */
+#endif

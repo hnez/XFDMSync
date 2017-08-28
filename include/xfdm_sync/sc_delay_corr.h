@@ -46,10 +46,9 @@ namespace gr {
        * class. xfdm_sync::sc_delay_corr::make is the public interface for
        * creating new instances.
        */
-      static sptr make(int seq_len);
+      static sptr make(int seq_len, bool normalize);
     };
+  }
+}
 
-  } // namespace xfdm_sync
-} // namespace gr
-
-#endif /* INCLUDED_XFDM_SYNC_SC_DELAY_CORR_H */
+#endif
