@@ -54,7 +54,7 @@ namespace gr {
       /* Find a power-of-two fft length that can fit
        * the synchronization pattern, an equally sized
        * padding and a bit of slack */
-      for(d_fft_len= 4; (2 * d_fft_len) < (3*seq_len); d_fft_len*=2);
+      for(d_fft_len= 4; d_fft_len < (3*seq_len); d_fft_len*=2);
 
       /* The block needs access to samples before and after
        * the tag so some delay is necessary */
@@ -141,7 +141,7 @@ namespace gr {
                         pmt::mp("preamble_start"));
 
       for(tag_t tag: tags) {
-        int tag_center= tag.offset - nitems_read(0);
+        int tag_center= tag.offset + history() - nitems_read(0);
 
         pmt::pmt_t info= tag.value;
 
