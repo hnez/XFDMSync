@@ -87,8 +87,8 @@ namespace gr {
       d_dbg_fd.fwd_in= open("/tmp/xfmd_fwd_in.bin", O_WRONLY | O_CREAT);
       d_dbg_fd.fwd_out= open("/tmp/xfmd_fwd_out.bin", O_WRONLY | O_CREAT);
 
-      d_dbg_fd.rwd_in= open("/tmp/xfmd_fwd_in.bin", O_WRONLY | O_CREAT);
-      d_dbg_fd.rwd_out= open("/tmp/xfmd_fwd_out.bin", O_WRONLY | O_CREAT);
+      d_dbg_fd.rwd_in= open("/tmp/xfmd_rwd_in.bin", O_WRONLY | O_CREAT);
+      d_dbg_fd.rwd_out= open("/tmp/xfmd_rwd_out.bin", O_WRONLY | O_CREAT);
 
       write(d_dbg_fd.seq, d_sequence_fq, sizeof(gr_complex) * d_fft_len);
       close(d_dbg_fd.seq);
