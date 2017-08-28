@@ -54,7 +54,7 @@ namespace gr {
       /* Find a power-of-two fft length that can fit
        * the synchronization pattern, an equally sized
        * padding and a bit of slack */
-      for(d_fft_len= 4; d_fft_len < (3*seq_len); d_fft_len*=2);
+      for(d_fft_len= 4; (2 * d_fft_len) < (3*seq_len); d_fft_len*=2);
 
       /* The block needs access to samples before and after
        * the tag so some delay is necessary */
@@ -141,7 +141,7 @@ namespace gr {
                         pmt::mp("preamble_start"));
 
       for(tag_t tag: tags) {
-        int tag_center= (int64_t)(tag.offset - nitems_read(0)) - d_fft_len/2;
+        int tag_center= tag.offset - nitems_read(0);
 
         pmt::pmt_t info= tag.value;
 
@@ -170,14 +170,14 @@ namespace gr {
 
         // Fill negative time
         volk_32fc_s32fc_x2_rotator_32fc(&fwd_in[d_fft_len - d_fft_len/4],
-                                        &in_pass[tag_center - d_fft_len/4],
+                                        &in_pass_history[tag_center - d_fft_len/4],
                                         fq_comp_rot,
                                         &fq_comp_acc,
                                         d_fft_len/4);
 
         // Fill positive time
         volk_32fc_s32fc_x2_rotator_32fc(&fwd_in[0],
-                                        &in_pass[tag_center],
+                                        &in_pass_history[tag_center],
                                         fq_comp_rot,
                                         &fq_comp_acc,
                                         d_fft_len/4);
@@ -202,13 +202,13 @@ namespace gr {
         // Fill positive time
         volk_32fc_x2_multiply_conjugate_32fc(&rwd_out[d_fft_len/2],
                                              &rwd_out[0],
-                                             &in_corr[tag_center],
+                                             &in_corr_history[tag_center],
                                              d_fft_len/4);
 
         // Fill negative time
         volk_32fc_x2_multiply_conjugate_32fc(&rwd_out[d_fft_len/2 - d_fft_len/4],
                                              &rwd_out[d_fft_len - d_fft_len/4],
-                                             &in_corr[tag_center - d_fft_len/4],
+                                             &in_corr_history[tag_center - d_fft_len/4],
                                              d_fft_len/4);
 
         // Locate the maximum
