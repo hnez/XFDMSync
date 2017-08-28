@@ -188,6 +188,9 @@ namespace gr {
                                              &in_corr[tag_center - d_fft_len/4],
                                              d_fft_len/4);
 
+        memcpy(&out_corr[tag.offset - nitems_written(0)], &rwd_out[0], sizeof(gr_complex) * d_fft_len/4);
+        memcpy(&out_corr[tag.offset - nitems_written(0) - d_fft_len/4], &rwd_out[d_fft_len - d_fft_len/4], sizeof(gr_complex) * d_fft_len/4);
+
         // Locate the maximum
         int32_t peak_idx_rel;
         volk_32fc_index_max_32u((uint32_t *) &peak_idx_rel,
