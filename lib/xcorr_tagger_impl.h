@@ -36,14 +36,6 @@ namespace gr {
       bool d_use_sc_rot;
       int d_fft_len;
 
-      struct {
-        int seq;
-        int fwd_in;
-        int fwd_out;
-        int rwd_in;
-        int rwd_out;
-      } d_dbg_fd;
-
       gr::fft::fft_complex *d_fft_fwd;
       gr::fft::fft_complex *d_fft_rwd;
 

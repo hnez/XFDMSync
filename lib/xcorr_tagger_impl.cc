@@ -27,9 +27,6 @@
 #include <gnuradio/io_signature.h>
 #include "xcorr_tagger_impl.h"
 
-/* TODO: remove */
-#include <fcntl.h>
-
 namespace gr {
   namespace xfdm_sync {
 
@@ -82,17 +79,6 @@ namespace gr {
 
       memcpy(d_sequence_fq, fwd_out, sizeof(gr_complex) * d_fft_len);
 
-      d_dbg_fd.seq= open("/tmp/xfdm_seq.bin", O_WRONLY | O_CREAT);
-
-      d_dbg_fd.fwd_in= open("/tmp/xfmd_fwd_in.bin", O_WRONLY | O_CREAT);
-      d_dbg_fd.fwd_out= open("/tmp/xfmd_fwd_out.bin", O_WRONLY | O_CREAT);
-
-      d_dbg_fd.rwd_in= open("/tmp/xfmd_rwd_in.bin", O_WRONLY | O_CREAT);
-      d_dbg_fd.rwd_out= open("/tmp/xfmd_rwd_out.bin", O_WRONLY | O_CREAT);
-
-      write(d_dbg_fd.seq, d_sequence_fq, sizeof(gr_complex) * d_fft_len);
-      close(d_dbg_fd.seq);
-
       /* Clear the input buffer.
        * It will be assumed to be zeroed later */
       memset(fwd_in, 0, sizeof(gr_complex) * d_fft_len);
@@ -104,11 +90,6 @@ namespace gr {
       delete d_fft_fwd;
 
       volk_free(d_sequence_fq);
-
-      close(d_dbg_fd.fwd_in);
-      close(d_dbg_fd.fwd_out);
-      close(d_dbg_fd.rwd_in);
-      close(d_dbg_fd.rwd_out);
     }
 
     int
@@ -182,15 +163,13 @@ namespace gr {
                                         &fq_comp_acc,
                                         d_fft_len/4);
 
-        write(d_dbg_fd.fwd_in, fwd_in, sizeof(gr_complex) * d_fft_len);
         d_fft_fwd->execute();
-        write(d_dbg_fd.fwd_out, fwd_out, sizeof(gr_complex) * d_fft_len);
 
         // Fill reverse fft buffer
         volk_32fc_x2_multiply_conjugate_32fc(rwd_in, fwd_out,
                                              d_sequence_fq, d_fft_len);
 
-        write(d_dbg_fd.rwd_in, rwd_in, sizeof(gr_complex) * d_fft_len);
+
         d_fft_rwd->execute();
 
         /* Use the correlation input to mask the
@@ -209,8 +188,6 @@ namespace gr {
                                              &rwd_out[d_fft_len - d_fft_len/4],
                                              &in_corr_history[tag_center - d_fft_len/4],
                                              d_fft_len/4);
-
-        write(d_dbg_fd.rwd_out, rwd_out, sizeof(gr_complex) * d_fft_len);
 
         // Locate the maximum
         int32_t peak_idx_rel;
@@ -240,7 +217,7 @@ namespace gr {
                               pmt::mp("sc_offset"),
                               pmt::from_uint64(tag.offset));
 
-          add_item_tag(0, (int64_t)tag.offset + (int64_t)peak_idx_rel,
+          add_item_tag(0, (int64_t)(tag.offset + d_fft_len/4) + peak_idx_rel,
                        pmt::mp("preamble_start"),
                        info);
 
