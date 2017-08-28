@@ -4,35 +4,38 @@
   <key>xfdm_sync_xcorr_tagger</key>
   <category>[xfdm_sync]</category>
   <import>import xfdm_sync</import>
-  <make>xfdm_sync.xcorr_tagger($sync_sequence)</make>
-  <!-- Make one 'param' node for every Parameter you want settable from the GUI.
-       Sub-nodes:
-       * name
-       * key (makes the value accessible as $keyname, e.g. in the make node)
-       * type -->
+  <make>xfdm_sync.xcorr_tagger($threshold, $sync_sequence, $use_sc_rot)</make>
+
   <param>
-    <name>...</name>
-    <key>...</key>
-    <type>...</type>
+    <name>Detection threshold</name>
+    <key>threshold</key>
+    <type>float</type>
   </param>
 
-  <!-- Make one 'sink' node per input. Sub-nodes:
-       * name (an identifier for the GUI)
-       * type
-       * vlen
-       * optional (set to 1 for optional inputs) -->
+  <param>
+    <name>Synchronization sequence</name>
+    <key>sync_sequence</key>
+    <type>complex_vector</type>
+  </param>
+
+  <param>
+    <name>Frequency compensate</name>
+    <key>use_sc_rot</key>
+    <type>bool</type>
+  </param>
+
   <sink>
-    <name>in</name>
-    <type><!-- e.g. int, float, complex, byte, short, xxx_vector, ...--></type>
+    <name>in_pass</name>
+    <type>complex</type>
   </sink>
 
-  <!-- Make one 'source' node per output. Sub-nodes:
-       * name (an identifier for the GUI)
-       * type
-       * vlen
-       * optional (set to 1 for optional inputs) -->
+  <sink>
+    <name>in_corr</name>
+    <type>complex</type>
+  </sink>
+
   <source>
     <name>out</name>
-    <type><!-- e.g. int, float, complex, byte, short, xxx_vector, ...--></type>
+    <type>complex</type>
   </source>
 </block>

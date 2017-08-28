@@ -5,34 +5,56 @@
   <category>[xfdm_sync]</category>
   <import>import xfdm_sync</import>
   <make>xfdm_sync.frame_gate($len_prologue, $len_epilogue, $len_symbol, $symbols_per_frame_min, $symbols_per_frame_max, $do_compensate)</make>
-  <!-- Make one 'param' node for every Parameter you want settable from the GUI.
-       Sub-nodes:
-       * name
-       * key (makes the value accessible as $keyname, e.g. in the make node)
-       * type -->
+
   <param>
-    <name>...</name>
-    <key>...</key>
-    <type>...</type>
+    <name>Prologue length</name>
+    <key>len_prologue</key>
+    <type>int</type>
   </param>
 
-  <!-- Make one 'sink' node per input. Sub-nodes:
-       * name (an identifier for the GUI)
-       * type
-       * vlen
-       * optional (set to 1 for optional inputs) -->
+  <param>
+    <name>Epilogue length</name>
+    <key>len_epilogue</key>
+    <type>int</type>
+  </param>
+
+  <param>
+    <name>Symbol length</name>
+    <key>len_symbol</key>
+    <type>int</type>
+  </param>
+
+  <param>
+    <name>Min Symbols per Frame</name>
+    <key>symbols_per_frame_min</key>
+    <type>int</type>
+  </param>
+
+  <param>
+    <name>Max Symbols per Frame</name>
+    <key>symbols_per_frame_max</key>
+    <type>int</type>
+  </param>
+
+  <param>
+    <name>Frequency Compensate</name>
+    <key>do_compensate</key>
+    <type>bool</type>
+  </param>
+
   <sink>
     <name>in</name>
-    <type><!-- e.g. int, float, complex, byte, short, xxx_vector, ...--></type>
+    <type>complex</type>
   </sink>
 
-  <!-- Make one 'source' node per output. Sub-nodes:
-       * name (an identifier for the GUI)
-       * type
-       * vlen
-       * optional (set to 1 for optional inputs) -->
+  <sink>
+    <name>frame_hint</name>
+    <type>message</type>
+    <optional>1</optional>
+  </sink>
+
   <source>
     <name>out</name>
-    <type><!-- e.g. int, float, complex, byte, short, xxx_vector, ...--></type>
+    <type>complex</type>
   </source>
 </block>

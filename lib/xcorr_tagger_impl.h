@@ -43,13 +43,11 @@ namespace gr {
       xcorr_tagger_impl(float threshold, pmt::pmt_t sync_sequence, bool use_sc_rot);
       ~xcorr_tagger_impl();
 
-      // Where all the action really happens
       int work(int noutput_items,
                gr_vector_const_void_star &input_items,
                gr_vector_void_star &output_items);
     };
+  }
+}
 
-  } // namespace xfdm_sync
-} // namespace gr
-
-#endif /* INCLUDED_XFDM_SYNC_XCORR_TAGGER_IMPL_H */
+#endif
