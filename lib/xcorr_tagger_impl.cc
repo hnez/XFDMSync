@@ -121,6 +121,8 @@ namespace gr {
                          tag_reg_start, tag_reg_end,
                          pmt::mp("preamble_start"));
 
+      printf("Tags between %ld and %ld: %ld\n", tag_reg_start, tag_reg_end, tags.size());
+
       for(tag_t tag: tags) {
         int tag_center= (int64_t)(tag.offset - nitems_read(0)) - d_fft_len/2;
 
@@ -211,6 +213,10 @@ namespace gr {
           info= pmt::dict_add(info,
                               pmt::mp("xcorr_idx"),
                               pmt::from_uint64(d_peak_idx));
+
+          info= pmt::dict_add(info,
+                              pmt::mp("sc_offset"),
+                              pmt::from_uint64(tag.offset));
 
           add_item_tag(0, (int64_t)tag.offset + (int64_t)peak_idx_rel,
                        pmt::mp("preamble_start"),
