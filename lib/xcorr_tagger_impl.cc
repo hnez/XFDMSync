@@ -117,7 +117,7 @@ namespace gr {
       uint64_t tag_reg_start= (nitems_read(0) > d_fft_len/4) ? (nitems_read(0) - d_fft_len/4) : 0;
       uint64_t tag_reg_end= nitems_read(0) + noutput_items - d_fft_len/4; /* TODO: this might break for large fft_lens*/
 
-      get_tags_in_window(tags, 0,
+      get_tags_in_range(tags, 0,
                          tag_reg_start, tag_reg_end,
                          pmt::mp("preamble_start"));
 
