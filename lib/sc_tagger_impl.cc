@@ -37,7 +37,7 @@ namespace gr {
     sc_tagger_impl::sc_tagger_impl(float thres_low, float thres_high, int seq_len)
       : gr::sync_block("sc_tagger",
                        gr::io_signature::make(2, 2, sizeof(gr_complex)),
-                       gr::io_signature::make(1, 1, sizeof(gr_complex))),
+                       gr::io_signature::make(2, 2, sizeof(gr_complex))),
       d_thres_low_sq(thres_low * thres_low),
       d_thres_high_sq(thres_high * thres_high),
       d_seq_len(seq_len),
@@ -60,14 +60,15 @@ namespace gr {
     {
       const gr_complex *in_pass_history = (const gr_complex *) input_items[0];
       const gr_complex *in_corr_history = (const gr_complex *) input_items[1];
-      gr_complex *out = (gr_complex *) output_items[0];
+      gr_complex *out_pass = (gr_complex *) output_items[0];
+      gr_complex *out_corr = (gr_complex *) output_items[1];
 
       const gr_complex *in_pass = &in_pass_history[history()];
       const gr_complex *in_corr = &in_corr_history[history()];
 
-      /* This block only adds tags and does not modify
-       * its input */
-      memcpy(out, &in_pass[-d_lookahead], sizeof(gr_complex) * noutput_items);
+      /* This block delays by d_lookahead samples */
+      memcpy(out_pass, &in_pass[-d_lookahead], sizeof(gr_complex) * noutput_items);
+      memcpy(out_corr, &in_corr[-d_lookahead], sizeof(gr_complex) * noutput_items);
 
       for(int io_idx= 0; io_idx<noutput_items; io_idx++) {
         gr_complex corr= in_corr[io_idx];
