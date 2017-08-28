@@ -83,7 +83,7 @@ namespace gr {
 
       /* Pre-heat norm_window and norm_acc with history-values */
       for(int io_idx= -norm_win_len; io_idx < 0; io_idx++) {
-        gr_complex power= std::norm(in[io_idx]);
+        float power= std::norm(in[io_idx]);
 
         norm_acc+= power;
         norm_window[norm_win_idx]= power;
@@ -93,7 +93,7 @@ namespace gr {
 
       for(int io_idx= 0; io_idx < noutput_items; io_idx++) {
         gr_complex conjmul= in[io_idx] * std::conj(in[io_idx - corr_win_len]);
-        gr_complex power= std::norm(in[io_idx]);
+        float power= std::norm(in[io_idx]);
 
         corr_acc-= corr_window[corr_win_idx];
         corr_window[corr_win_idx]= conjmul;
@@ -103,7 +103,7 @@ namespace gr {
         norm_window[norm_win_idx]= power;
         norm_acc+= power;
 
-        out_corr[io_idx]= d_normalize ? (2 * corr_acc / norm_acc) : corr_acc;
+        out_corr[io_idx]= d_normalize ? (2.0f * corr_acc / norm_acc) : corr_acc;
         out_pass[io_idx]= in[io_idx];
 
         corr_win_idx= (corr_win_idx + 1) % corr_win_len;
