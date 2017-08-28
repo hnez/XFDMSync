@@ -103,8 +103,11 @@ namespace gr {
         norm_window[norm_win_idx]= power;
         norm_acc+= power;
 
-        out_corr[io_idx]= d_normalize ? (2.0f * corr_acc / norm_acc) : corr_acc;
-        out_pass[io_idx]= in[io_idx];
+        out_corr[io_idx]= d_normalize
+          ? ((norm_acc > 0) ? (2.0f * corr_acc / norm_acc) : 0)
+          : corr_acc;
+
+        out_pass[io_idx]= in[io_idx - norm_win_len];
 
         corr_win_idx= (corr_win_idx + 1) % corr_win_len;
         norm_win_idx= (norm_win_idx + 1) % norm_win_len;
