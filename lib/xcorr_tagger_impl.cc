@@ -39,7 +39,7 @@ namespace gr {
     xcorr_tagger_impl::xcorr_tagger_impl(float threshold, pmt::pmt_t sync_sequence, bool use_sc_rot)
       : gr::sync_block("xcorr_tagger",
                        gr::io_signature::make(2, 2, sizeof(gr_complex)),
-                       gr::io_signature::make(1, 1, sizeof(gr_complex))),
+                       gr::io_signature::make(2, 2, sizeof(gr_complex))),
       d_threshold(threshold),
       d_peak_idx(0),
       d_use_sc_rot(use_sc_rot)
@@ -58,11 +58,15 @@ namespace gr {
        * padding and a bit of slack */
       for(d_fft_len= 4; d_fft_len < (3*seq_len); d_fft_len*=2);
 
+      /* The block needs access to samples before and after
+       * the tag so some delay is necessary */
+      set_history(d_fft_len/2);
+
       /* Allocate space for the fourier-transformed sequence */
-      d_sequence_fq= new gr_complex[d_fft_len];
+      d_sequence_fq= (gr_complex *)volk_malloc(sizeof(gr_complex) * d_fft_len,
+                                               volk_get_alignment());
 
       /* Let the GNURadio wrapper setup some fftw contexts */
-
       d_fft_fwd= new gr::fft::fft_complex(d_fft_len, true, 1);
       d_fft_rwd= new gr::fft::fft_complex(d_fft_len, false, 1);
 
@@ -90,7 +94,7 @@ namespace gr {
       delete d_fft_fwd;
       delete d_fft_fwd;
 
-      delete[] d_sequence_fq;
+      volk_free(d_sequence_fq);
     }
 
     int
@@ -100,20 +104,30 @@ namespace gr {
     {
       const gr_complex *in_pass_history = (const gr_complex *) input_items[0];
       const gr_complex *in_corr_history = (const gr_complex *) input_items[1];
-      gr_complex *out = (gr_complex *) output_items[0];
+      gr_complex *out_pass = (gr_complex *) output_items[0];
+      gr_complex *out_corr = (gr_complex *) output_items[1];
 
-      const gr_complex *in_pass= &in_pass_history[history()];
-      const gr_complex *in_corr= &in_corr_history[history()];
+      /* The history is d_fft_len/2 samples long.
+       * The indexing done below allows us to read in_pass and in_corr
+       * from -d_fft_len/4 to in_len+d_fft_len/4. */
+      const gr_complex *in_pass= &in_pass_history[d_fft_len/4];
+      const gr_complex *in_corr= &in_corr_history[d_fft_len/4];
 
-      /* This block only adds tags and does not modify
-       * its input */
-      memcpy(out, in_pass, sizeof(gr_complex) * noutput_items);
+      /* This block delays by d_fft_len/4 samples */
+      memcpy(out_pass, in_pass, sizeof(gr_complex) * noutput_items);
+      memcpy(out_corr, in_corr, sizeof(gr_complex) * noutput_items);
 
       std::vector<tag_t> tags;
-      get_tags_in_window(tags, 0, 0, noutput_items, pmt::mp("preamble_start"));
+
+      uint64_t tag_reg_start= (nitems_read(0) > d_fft_len/4) ? (nitems_read(0) - d_fft_len/4) : 0;
+      uint64_t tag_reg_end= nitems_read(0) + noutput_items - d_fft_len/4; /* TODO: this might break for large fft_lens*/
+
+      get_tags_in_window(tags, 0,
+                         tag_reg_start, tag_reg_end,
+                         pmt::mp("preamble_start"));
 
       for(tag_t tag: tags) {
-        int64_t tag_center= (int64_t)tag.offset - (int64_t)nitems_read(0);
+        int tag_center= (int64_t)(tag.offset - nitems_read(0)) - d_fft_len/2;
 
         pmt::pmt_t info= tag.value;
 
@@ -164,11 +178,8 @@ namespace gr {
 
         /* Use the correlation input to mask the
          * wrong cross-correlation peaks.
-         * In the end we are only interested in the magnitude
-         * so there is no need to do a complex multiplication,
-         * but the buffers are complex and multiply_conjugate
-         * is allready in the instruction cache so i will use it here.
-         * This will overwrite the padding part of rwd_out. */
+         * This will overwrite the padding part of rwd_out.
+         * Just to prevent having to allocate a new buffer */
 
         // Fill positive time
         volk_32fc_x2_multiply_conjugate_32fc(&rwd_out[d_fft_len/2],
@@ -194,17 +205,17 @@ namespace gr {
         peak_idx_rel-= d_fft_len/4;
 
         if(power > d_threshold) {
-          pmt::dict_add(info,
-                        pmt::mp("xcorr_power"),
-                        pmt::from_double(power));
+          info= pmt::dict_add(info,
+                              pmt::mp("xcorr_power"),
+                              pmt::from_double(power));
 
-          pmt::dict_add(info,
-                        pmt::mp("xcorr_rot"),
-                        pmt::from_complex(peak / power));
+          info= pmt::dict_add(info,
+                              pmt::mp("xcorr_rot"),
+                              pmt::from_complex(peak / power));
 
-          pmt::dict_add(info,
-                        pmt::mp("xcorr_idx"),
-                        pmt::from_uint64(d_peak_idx));
+          info= pmt::dict_add(info,
+                              pmt::mp("xcorr_idx"),
+                              pmt::from_uint64(d_peak_idx));
 
           add_item_tag(0, (int64_t)tag.offset + (int64_t)peak_idx_rel,
                        pmt::mp("preamble_start"),

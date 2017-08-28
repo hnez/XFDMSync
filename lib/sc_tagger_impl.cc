@@ -44,6 +44,8 @@ namespace gr {
       d_lookahead(2*seq_len),
       d_peak({.id=0, .am_inside=false})
     {
+      set_tag_propagation_policy(TPP_DONT);
+
       set_history(d_lookahead);
     }
 
