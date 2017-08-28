@@ -80,17 +80,17 @@ namespace gr {
           rot_per_sym/= std::abs(rot_per_sym);
 
           pmt::pmt_t info= pmt::make_dict();
-          pmt::dict_add(info,
-                        pmt::mp("sc_corr_power"),
-                        pmt::from_double(corr_power));
+          info= pmt::dict_add(info,
+                              pmt::mp("sc_corr_power"),
+                              pmt::from_double(corr_power));
 
-          pmt::dict_add(info,
-                        pmt::mp("sc_rot"),
-                        pmt::from_complex(rot_per_sym));
+          info= pmt::dict_add(info,
+                              pmt::mp("sc_rot"),
+                              pmt::from_complex(rot_per_sym));
 
-          pmt::dict_add(info,
-                        pmt::mp("sc_idx"),
-                        pmt::from_uint64(d_peak.id));
+          info= pmt::dict_add(info,
+                              pmt::mp("sc_idx"),
+                              pmt::from_uint64(d_peak.id));
 
           add_item_tag(0, d_peak.abs_idx,
                        pmt::mp("preamble_start"),
