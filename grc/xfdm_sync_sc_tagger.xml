@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <block>
-  <name>sc_tagger</name>
+  <name>Schmidl and Cox tagger</name>
   <key>xfdm_sync_sc_tagger</key>
   <category>[xfdm_sync]</category>
   <import>import xfdm_sync</import>

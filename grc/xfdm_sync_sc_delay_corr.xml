@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <block>
-  <name>sc_delay_corr</name>
+  <name>Schmidl and Cox correlator</name>
   <key>xfdm_sync_sc_delay_corr</key>
   <category>[xfdm_sync]</category>
   <import>import xfdm_sync</import>

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <block>
-  <name>xcorr_tagger</name>
+  <name>Cross-correlation tagger</name>
   <key>xfdm_sync_xcorr_tagger</key>
   <category>[xfdm_sync]</category>
   <import>import xfdm_sync</import>

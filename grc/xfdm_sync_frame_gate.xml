@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <block>
-  <name>frame_gate</name>
+  <name>Frame Gate</name>
   <key>xfdm_sync_frame_gate</key>
   <category>[xfdm_sync]</category>
   <import>import xfdm_sync</import>
