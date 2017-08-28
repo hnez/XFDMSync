@@ -41,10 +41,10 @@ namespace gr {
       d_thres_low_sq(thres_low * thres_low),
       d_thres_high_sq(thres_high * thres_high),
       d_seq_len(seq_len),
-      d_peak_idx(0),
-      d_peak({.am_inside=false})
+      d_lookahead(2*seq_len),
+      d_peak({.id=0, .am_inside=false})
     {
-      set_history(2 * seq_len);
+      set_history(d_lookahead);
     }
 
     sc_tagger_impl::~sc_tagger_impl()
@@ -65,10 +65,10 @@ namespace gr {
 
       /* This block only adds tags and does not modify
        * its input */
-      memcpy(out, in_pass, sizeof(gr_complex) * noutput_items);
+      memcpy(out, &in_pass[-d_lookahead], sizeof(gr_complex) * noutput_items);
 
-      for(int hist_idx= 0; hist_idx<noutput_items; hist_idx++) {
-        gr_complex corr= in_corr_history[hist_idx];
+      for(int io_idx= 0; io_idx<noutput_items; io_idx++) {
+        gr_complex corr= in_corr[io_idx];
         float power_sq= std::norm(corr);
 
         /* check if we left the peak with the current sample */
@@ -90,13 +90,13 @@ namespace gr {
 
           pmt::dict_add(info,
                         pmt::mp("sc_idx"),
-                        pmt::from_uint64(d_peak_idx));
+                        pmt::from_uint64(d_peak.id));
 
           add_item_tag(0, d_peak.abs_idx,
                        pmt::mp("preamble_start"),
                        info);
 
-          d_peak_idx++;
+          d_peak.id++;
         }
 
         /* check if we entered the peak with the current sample */
@@ -106,7 +106,7 @@ namespace gr {
         }
 
         if(d_peak.am_inside && (d_peak.corr_pw_sq < power_sq)) {
-          d_peak.abs_idx= nitems_read(0) + hist_idx + history();
+          d_peak.abs_idx= nitems_read(0) + io_idx + d_lookahead;
           d_peak.corr= corr;
           d_peak.corr_pw_sq= power_sq;
         }

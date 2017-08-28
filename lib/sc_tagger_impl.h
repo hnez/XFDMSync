@@ -31,11 +31,12 @@ namespace gr {
     private:
       float d_thres_low_sq;
       float d_thres_high_sq;
-      int d_seq_len;
 
-      uint64_t d_peak_idx;
+      int d_seq_len;
+      int d_lookahead;
 
       struct {
+        uint64_t id;
         bool am_inside;
         uint64_t abs_idx;
         gr_complex corr;
@@ -46,13 +47,11 @@ namespace gr {
       sc_tagger_impl(float thres_low, float thres_high, int seq_len);
       ~sc_tagger_impl();
 
-      // Where all the action really happens
       int work(int noutput_items,
                gr_vector_const_void_star &input_items,
                gr_vector_void_star &output_items);
     };
+  }
+}
 
-  } // namespace xfdm_sync
-} // namespace gr
-
-#endif /* INCLUDED_XFDM_SYNC_SC_TAGGER_IMPL_H */
+#endif
