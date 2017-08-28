@@ -192,7 +192,6 @@ namespace gr {
 
         write(d_dbg_fd.rwd_in, rwd_in, sizeof(gr_complex) * d_fft_len);
         d_fft_rwd->execute();
-        write(d_dbg_fd.rwd_out, rwd_out, sizeof(gr_complex) * d_fft_len);
 
         /* Use the correlation input to mask the
          * wrong cross-correlation peaks.
@@ -210,6 +209,8 @@ namespace gr {
                                              &rwd_out[d_fft_len - d_fft_len/4],
                                              &in_corr_history[tag_center - d_fft_len/4],
                                              d_fft_len/4);
+
+        write(d_dbg_fd.rwd_out, rwd_out, sizeof(gr_complex) * d_fft_len);
 
         // Locate the maximum
         int32_t peak_idx_rel;
