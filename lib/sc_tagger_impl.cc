@@ -41,12 +41,14 @@ namespace gr {
       d_thres_low_sq(thres_low * thres_low),
       d_thres_high_sq(thres_high * thres_high),
       d_seq_len(seq_len),
-      d_lookahead(2*seq_len),
-      d_peak({.id=0, .am_inside=false})
+      d_lookahead(2*seq_len)
     {
       set_tag_propagation_policy(TPP_DONT);
 
       set_history(d_lookahead);
+
+      d_peak.id= 0;
+      d_peak.am_inside= false;
     }
 
     sc_tagger_impl::~sc_tagger_impl()

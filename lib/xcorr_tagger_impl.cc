@@ -114,7 +114,7 @@ namespace gr {
 
       std::vector<tag_t> tags;
 
-      uint64_t tag_reg_start= (nitems_read(0) > block_delay) ? (nitems_read(0) - block_delay) : 0;
+      uint64_t tag_reg_start= ((int64_t)nitems_read(0) > block_delay) ? (nitems_read(0) - block_delay) : 0;
       uint64_t tag_reg_end= nitems_read(0) + noutput_items - block_delay; /* TODO: this might break for large fft_lens*/
 
       get_tags_in_range(tags, 0,

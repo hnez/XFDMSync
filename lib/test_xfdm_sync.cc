@@ -33,7 +33,8 @@
 #include <fstream>
 
 int
-main (int argc, char **argv)
+main (int argc __attribute__((unused)),
+      char **argv __attribute__((unused)))
 {
   CppUnit::TextTestRunner runner;
   std::ofstream xmlfile(get_unittest_path("xfdm_sync.xml").c_str());
