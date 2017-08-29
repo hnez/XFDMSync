@@ -105,17 +105,17 @@ namespace gr {
       /* The history is d_fft_len/2 samples long.
        * The indexing done below allows us to read in_pass and in_corr
        * from -d_fft_len/4 to in_len+d_fft_len/4. */
-      const gr_complex *in_pass= &in_pass_history[d_fft_len/4];
-      const gr_complex *in_corr= &in_corr_history[d_fft_len/4];
+      int block_delay= d_fft_len/4;
+      const gr_complex *in_pass= &in_pass_history[block_delay];
+      const gr_complex *in_corr= &in_corr_history[block_delay];
 
-      /* This block delays by d_fft_len/4 samples */
       memcpy(out_pass, in_pass, sizeof(gr_complex) * noutput_items);
       memcpy(out_corr, in_corr, sizeof(gr_complex) * noutput_items);
 
       std::vector<tag_t> tags;
 
-      uint64_t tag_reg_start= (nitems_read(0) > d_fft_len/4) ? (nitems_read(0) - d_fft_len/4) : 0;
-      uint64_t tag_reg_end= nitems_read(0) + noutput_items - d_fft_len/4; /* TODO: this might break for large fft_lens*/
+      uint64_t tag_reg_start= (nitems_read(0) > block_delay) ? (nitems_read(0) - block_delay) : 0;
+      uint64_t tag_reg_end= nitems_read(0) + noutput_items - block_delay; /* TODO: this might break for large fft_lens*/
 
       get_tags_in_range(tags, 0,
                         tag_reg_start, tag_reg_end,
@@ -123,6 +123,9 @@ namespace gr {
 
       for(tag_t tag: tags) {
         int tag_center= tag.offset + history() - nitems_read(0);
+
+        const int fft_payload_len= d_fft_len/2;
+        const int fft_payload_half_len= fft_payload_len/2;
 
         pmt::pmt_t info= tag.value;
 
@@ -146,22 +149,22 @@ namespace gr {
           }
         }
 
-        gr_complex fq_comp_acc= std::pow(fq_comp_rot, -d_fft_len/2.0f);
+        gr_complex fq_comp_acc= std::pow(fq_comp_rot, -1.0f * fft_payload_half_len);
         fq_comp_acc/= std::abs(fq_comp_acc);
 
         // Fill negative time
-        volk_32fc_s32fc_x2_rotator_32fc(&fwd_in[d_fft_len - d_fft_len/4],
-                                        &in_pass_history[tag_center - d_fft_len/4],
+        volk_32fc_s32fc_x2_rotator_32fc(&fwd_in[d_fft_len - fft_payload_half_len],
+                                        &in_pass_history[tag_center - fft_payload_half_len],
                                         fq_comp_rot,
                                         &fq_comp_acc,
-                                        d_fft_len/4);
+                                        fft_payload_half_len);
 
         // Fill positive time
         volk_32fc_s32fc_x2_rotator_32fc(&fwd_in[0],
                                         &in_pass_history[tag_center],
                                         fq_comp_rot,
                                         &fq_comp_acc,
-                                        d_fft_len/4);
+                                        fft_payload_half_len);
 
         d_fft_fwd->execute();
 
@@ -172,42 +175,70 @@ namespace gr {
 
         d_fft_rwd->execute();
 
+
         /* Use the correlation input to mask the
          * wrong cross-correlation peaks.
          * This will overwrite the padding part of rwd_out.
          * Just to prevent having to allocate a new buffer */
 
-        // Fill positive time
-        volk_32fc_x2_multiply_conjugate_32fc(&rwd_out[d_fft_len/2],
-                                             &rwd_out[0],
-                                             &in_corr_history[tag_center],
-                                             d_fft_len/4);
+        /* Create some aliases into the rwd_out buffer that
+         * are used in the following sections.
+         * We could allocate a buffer for each of theses sections
+         * but allocating/deallocating them and handling alignments
+         * looked like work to me */
+        gr_complex *scratch_neg_time= &rwd_out[d_fft_len/2 - fft_payload_half_len];
+        gr_complex *scratch_pos_time= &rwd_out[d_fft_len/2];
+        float *scratch_mag_sq= (float*)&rwd_out[0];
 
         // Fill negative time
-        volk_32fc_x2_multiply_conjugate_32fc(&rwd_out[d_fft_len/2 - d_fft_len/4],
-                                             &rwd_out[d_fft_len - d_fft_len/4],
-                                             &in_corr_history[tag_center - d_fft_len/4],
-                                             d_fft_len/4);
+        volk_32fc_x2_multiply_conjugate_32fc(scratch_neg_time,
+                                             &rwd_out[d_fft_len - fft_payload_half_len],
+                                             &in_corr_history[tag_center - fft_payload_half_len],
+                                             fft_payload_half_len);
+
+        // Fill positive time
+        volk_32fc_x2_multiply_conjugate_32fc(scratch_pos_time,
+                                             &rwd_out[0],
+                                             &in_corr_history[tag_center],
+                                             fft_payload_half_len);
+
+        /* Calculate the mag^2 of the correlation output
+         * this will again reuse rwd_out as output */
+        volk_32fc_magnitude_squared_32f(scratch_mag_sq,
+                                        scratch_neg_time,
+                                        fft_payload_len);
 
         // Locate the maximum
-        int32_t peak_idx_rel;
-        volk_32fc_index_max_32u((uint32_t *) &peak_idx_rel,
-                                &rwd_out[d_fft_len/2 - d_fft_len/4],
-                                d_fft_len/2);
+        int32_t peak_idx_rel= 0;
+        volk_32f_index_max_32u((uint32_t *) &peak_idx_rel,
+                               scratch_mag_sq,
+                               fft_payload_len);
 
-        gr_complex peak= rwd_out[d_fft_len/2 - d_fft_len/4 + peak_idx_rel];
-        float power= std::abs(peak);
+        // Determine the absolute energy
+        float avg_fft_power= 0;
+        volk_32f_accumulator_s32f(&avg_fft_power,
+                                  scratch_mag_sq,
+                                  fft_payload_len);
+        avg_fft_power/= fft_payload_len;
 
-        peak_idx_rel-= d_fft_len/4;
+        gr_complex peak= scratch_neg_time[peak_idx_rel];
+        float power= scratch_mag_sq[peak_idx_rel];
+        float rel_power= power/avg_fft_power;
 
-        if(power > d_threshold) {
+        peak_idx_rel-= fft_payload_half_len;
+
+        if(rel_power > d_threshold) {
           info= pmt::dict_add(info,
                               pmt::mp("xcorr_power"),
                               pmt::from_double(power));
 
           info= pmt::dict_add(info,
+                              pmt::mp("xcorr_rel_power"),
+                              pmt::from_double(rel_power));
+
+          info= pmt::dict_add(info,
                               pmt::mp("xcorr_rot"),
-                              pmt::from_complex(peak / power));
+                              pmt::from_complex(peak / std::abs(peak)));
 
           info= pmt::dict_add(info,
                               pmt::mp("xcorr_idx"),
