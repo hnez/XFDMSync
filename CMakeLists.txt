@@ -37,6 +37,13 @@ if(NOT CMAKE_BUILD_TYPE)
 endif(NOT CMAKE_BUILD_TYPE)
 set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "")
 
+# In some old versions of GCC (<6.0) the default C++ standard
+# version is less than c++98, so some useful features
+# are disabled.
+# This should set the C++ standard to c++11 if a "recent"
+# (>=3.1) cmake is used.
+set(CMAKE_CXX_STANDARD 11)
+
 #make sure our local CMake Modules path comes first
 list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
@@ -69,6 +76,9 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCXX AND NOT WIN32)
     #http://gcc.gnu.org/wiki/Visibility
     add_definitions(-fvisibility=hidden)
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -ffast-math -funsafe-math-optimizations")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wstrict-overflow -Wshadow -fno-strict-aliasing")
 endif()
 
 ########################################################################
