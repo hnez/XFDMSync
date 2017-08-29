@@ -22,8 +22,14 @@
 #include "config.h"
 #endif
 
+#include <volk/volk.h>
 #include <gnuradio/io_signature.h>
 #include "sc_delay_corr_impl.h"
+
+/* volk_get_alignment can not be evaluated at compile-time.
+ * But __builtin_assume_aligned needs an alignment at compile-time.
+ * 32 bytes alignment should be correct for SSE and AVX */
+#define MEM_ALIGNMENT (32)
 
 namespace gr {
   namespace xfdm_sync {
@@ -42,10 +48,23 @@ namespace gr {
       d_normalize(normalize)
     {
       set_history(2 * seq_len);
+
+      for(int i=0; i<3; i++) {
+        d_corr_windows[i]= (gr_complex *)volk_malloc(sizeof(gr_complex) * d_seq_len,
+                                                     MEM_ALIGNMENT);
+      }
+
+      for(int i=0; i<4; i++) {
+        d_norm_windows[i]= (float *)volk_malloc(sizeof(float) * d_seq_len,
+                                                MEM_ALIGNMENT);
+      }
+
     }
 
     sc_delay_corr_impl::~sc_delay_corr_impl()
     {
+      for(int i=0; i<3; i++) volk_free(d_corr_windows[i]);
+      for(int i=0; i<4; i++) volk_free(d_norm_windows[i]);
     }
 
     int
@@ -61,60 +80,110 @@ namespace gr {
        * using negative indices */
       const gr_complex *in= &in_history[history()];
 
-      int corr_win_len= d_seq_len;
-      int corr_win_idx= 0;
-      
-      gr_complex* corr_window = new gr_complex[corr_win_len];
-      gr_complex corr_acc= 0;
+      /* Output the delayed input stream */
+      memcpy(out_pass, &in[-d_seq_len * 2], sizeof(gr_complex) * noutput_items);
 
-      int norm_win_len= 2*d_seq_len;
-      int norm_win_idx= 0;
-      float* norm_window = new float[norm_win_len];
+      gr_complex *wc_old=     (gr_complex *)__builtin_assume_aligned(d_corr_windows[0], MEM_ALIGNMENT);
+      gr_complex *wc_cur=     (gr_complex *)__builtin_assume_aligned(d_corr_windows[1], MEM_ALIGNMENT);
+      gr_complex *wc_scratch= (gr_complex *)__builtin_assume_aligned(d_corr_windows[2], MEM_ALIGNMENT);
+
+      float *wn_older=   (float *)__builtin_assume_aligned(d_norm_windows[0], MEM_ALIGNMENT);
+      float *wn_old=     (float *)__builtin_assume_aligned(d_norm_windows[1], MEM_ALIGNMENT);
+      float *wn_cur=     (float *)__builtin_assume_aligned(d_norm_windows[2], MEM_ALIGNMENT);
+      float *wn_scratch= (float *)__builtin_assume_aligned(d_norm_windows[3], MEM_ALIGNMENT);
+
+      gr_complex corr_acc= 0;
       float norm_acc= 0;
 
-      /* Pre-heat corr_window and corr_acc with history-values */
-      for(int io_idx= -corr_win_len; io_idx < 0; io_idx++) {
-        gr_complex conjmul= in[io_idx] * std::conj(in[io_idx - corr_win_len]);
+      /* Pre-heat correlation window and corr_acc with history-values */
+      volk_32fc_x2_multiply_conjugate_32fc(wc_cur,
+                                           &in[-d_seq_len],
+                                           &in[-d_seq_len * 2],
+                                           d_seq_len);
 
-        corr_acc+= conjmul;
-        corr_window[corr_win_idx]= conjmul;
+      for(int i=0; i<d_seq_len; i++) corr_acc+= wc_cur[i];
 
-        corr_win_idx= (corr_win_idx + 1) % corr_win_len;
+      /* Pre-heat norm window and norm_acc with history-values */
+      volk_32fc_magnitude_squared_32f(wn_old,
+                                      &in[-2*d_seq_len],
+                                      d_seq_len);
+
+      for(int i=0; i<d_seq_len; i++) norm_acc+= wn_old[i];
+
+      volk_32fc_magnitude_squared_32f(wn_cur,
+                                      &in[-d_seq_len],
+                                      d_seq_len);
+
+      for(int i=0; i<d_seq_len; i++) norm_acc+= wn_cur[i];
+
+      int io_idx= 0;
+
+      /* Processing whole windows at once allows us to vectorize most
+       * of the processing.
+       * I hope it does not only make the code unreadable but will also
+       * help with performance. */
+      for(io_idx= 0;
+          (io_idx + d_seq_len) <= noutput_items;
+          io_idx+= d_seq_len) {
+
+        /* Cycle the buffers */
+        gr_complex *wc_tmp= wc_old;
+        wc_old= (gr_complex *)__builtin_assume_aligned(wc_cur, MEM_ALIGNMENT);
+        wc_cur= (gr_complex *)__builtin_assume_aligned(wc_tmp, MEM_ALIGNMENT);
+
+        float *wn_tmp= wn_older;
+        wn_older= (float *)__builtin_assume_aligned(wn_old, MEM_ALIGNMENT);
+        wn_old=   (float *)__builtin_assume_aligned(wn_cur, MEM_ALIGNMENT);;
+        wn_cur=   (float *)__builtin_assume_aligned(wn_tmp, MEM_ALIGNMENT);;
+
+
+        // Calculate next correlation window
+        volk_32fc_x2_multiply_conjugate_32fc(wc_cur,
+                                             &in[io_idx],
+                                             &in[io_idx - d_seq_len],
+                                             d_seq_len);
+
+        // Subtract samples leaving the window
+        volk_32f_x2_subtract_32f((float *)wc_scratch,
+                                 (float *)wc_cur,
+                                 (float *)wc_old,
+                                 2*d_seq_len);
+
+        // Calculate next normalization window
+        volk_32fc_magnitude_squared_32f(wn_cur,
+                                        &in[io_idx],
+                                        d_seq_len);
+
+        // Subtract samples leaving the window
+        volk_32f_x2_subtract_32f(wn_scratch,
+                                 wn_cur,
+                                 wn_older,
+                                 d_seq_len);
+
+        // Slide through the window and produce output
+        for(int i=0; i<d_seq_len; i++) {
+          corr_acc+= wc_scratch[i];
+          norm_acc+= wn_scratch[i];
+
+          /* norm_acc _should_ only be zero id corr_acc is also zero */
+          out_corr[io_idx + i]= 2.0f * corr_acc / norm_acc;
+        }
       }
 
-      /* Pre-heat norm_window and norm_acc with history-values */
-      for(int io_idx= -norm_win_len; io_idx < 0; io_idx++) {
-        float power= std::norm(in[io_idx]);
+      /* Process the leftover samples */
+      for(int i=0; io_idx < noutput_items; io_idx++, i++) {
+        gr_complex a= in[io_idx];
+        gr_complex b= in[io_idx - d_seq_len];
 
-        norm_acc+= power;
-        norm_window[norm_win_idx]= power;
+        corr_acc-= wc_cur[i];
+        corr_acc+= a * std::conj(b);
 
-        norm_win_idx= (norm_win_idx + 1) % norm_win_len;
+        norm_acc-= wn_cur[i];
+        norm_acc+= std::norm(a);
+
+        out_corr[io_idx]= 2.0f * corr_acc / norm_acc;
       }
 
-      for(int io_idx= 0; io_idx < noutput_items; io_idx++) {
-        gr_complex conjmul= in[io_idx] * std::conj(in[io_idx - corr_win_len]);
-        float power= std::norm(in[io_idx]);
-
-        corr_acc-= corr_window[corr_win_idx];
-        corr_window[corr_win_idx]= conjmul;
-        corr_acc+= conjmul;
-
-        norm_acc-= norm_window[norm_win_idx];
-        norm_window[norm_win_idx]= power;
-        norm_acc+= power;
-
-        out_corr[io_idx]= d_normalize
-          ? ((norm_acc > 0) ? (2.0f * corr_acc / norm_acc) : 0)
-          : corr_acc;
-
-        out_pass[io_idx]= in[io_idx - norm_win_len];
-
-        corr_win_idx= (corr_win_idx + 1) % corr_win_len;
-        norm_win_idx= (norm_win_idx + 1) % norm_win_len;
-      }
-      delete [] corr_window;
-      delete [] norm_window;
       return noutput_items;
     }
   }

@@ -29,8 +29,11 @@ namespace gr {
     class sc_delay_corr_impl : public sc_delay_corr
     {
     private:
-      int d_seq_len;
-      bool d_normalize;
+      const int d_seq_len;
+      const bool d_normalize;
+
+      gr_complex *d_corr_windows[3];
+      float *d_norm_windows[4];
 
     public:
       sc_delay_corr_impl(int seq_len, bool normalize);
