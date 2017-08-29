@@ -63,12 +63,13 @@ namespace gr {
 
       int corr_win_len= d_seq_len;
       int corr_win_idx= 0;
-      gr_complex corr_window[corr_win_len]= {0};
+      
+      gr_complex* corr_window = new gr_complex[corr_win_len];
       gr_complex corr_acc= 0;
 
       int norm_win_len= 2*d_seq_len;
       int norm_win_idx= 0;
-      float norm_window[norm_win_len]= {0};
+      float* norm_window = new float[norm_win_len];
       float norm_acc= 0;
 
       /* Pre-heat corr_window and corr_acc with history-values */
@@ -112,7 +113,8 @@ namespace gr {
         corr_win_idx= (corr_win_idx + 1) % corr_win_len;
         norm_win_idx= (norm_win_idx + 1) % norm_win_len;
       }
-
+      delete [] corr_window;
+      delete [] norm_window;
       return noutput_items;
     }
   }

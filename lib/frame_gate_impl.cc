@@ -79,7 +79,7 @@ namespace gr {
     frame_gate_impl::on_frame_hint(pmt::pmt_t msg)
     {
       if(!pmt::is_tuple(msg) || (pmt::length(msg) != 3)) {
-        GR_LOG_WARN(LOG, "frame_gate: frame_hint was not formatted correctly\n");
+        GR_LOG_WARN(d_debug_logger, "frame_gate: frame_hint was not formatted correctly\n");
         return;
       }
 
