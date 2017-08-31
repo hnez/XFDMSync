@@ -29,16 +29,19 @@ namespace gr {
     class sc_tagger_impl : public sc_tagger
     {
     private:
-      const float d_thres_low_sq;
-      const float d_thres_high_sq;
+      float d_thres_low_sq;
+      float d_thres_high_sq;
 
-      const int d_seq_len;
-      const int d_lookahead;
+      int d_seq_len;
+      int d_lookahead;
 
-      float *d_scratch_magsq;
-      uint64_t d_inside_carry;
-      uint64_t d_peak_start_abs;
-      uint64_t d_peak_id;
+      struct {
+        uint64_t id;
+        bool am_inside;
+        uint64_t abs_idx;
+        gr_complex corr;
+        float corr_pw_sq;
+      } d_peak;
 
     public:
       sc_tagger_impl(float thres_low, float thres_high, int seq_len);

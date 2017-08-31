@@ -22,17 +22,12 @@
 #include "config.h"
 #endif
 
-#include <volk/volk.h>
 #include <gnuradio/io_signature.h>
 #include "sc_tagger_impl.h"
 
-/* volk_get_alignment can not be evaluated at compile-time.
- * But __builtin_assume_aligned needs an alignment at compile-time.
- * 32 bytes alignment should be correct for SSE and AVX */
-#define MEM_ALIGNMENT (32)
-
 namespace gr {
   namespace xfdm_sync {
+
     sc_tagger::sptr
     sc_tagger::make(float thres_low, float thres_high, int seq_len)
     {
@@ -46,22 +41,18 @@ namespace gr {
       d_thres_low_sq(thres_low * thres_low),
       d_thres_high_sq(thres_high * thres_high),
       d_seq_len(seq_len),
-      d_lookahead(2*seq_len),
-      d_inside_carry(0),
-      d_peak_start_abs(0),
-      d_peak_id(0)
+      d_lookahead(2*seq_len)
     {
       set_tag_propagation_policy(TPP_DONT);
 
       set_history(d_lookahead);
 
-      d_scratch_magsq= (float *)volk_malloc(sizeof(float) * 64,
-                                            MEM_ALIGNMENT);
+      d_peak.id= 0;
+      d_peak.am_inside= false;
     }
 
     sc_tagger_impl::~sc_tagger_impl()
     {
-      volk_free(d_scratch_magsq);
     }
 
     int
@@ -77,112 +68,57 @@ namespace gr {
       const gr_complex *in_pass = &in_pass_history[history()];
       const gr_complex *in_corr = &in_corr_history[history()];
 
-      // Make sure noutput_items is a multiple of 64
-      noutput_items= (noutput_items / 64) * 64;
-
-      // Allow GCC to make optimizations based on memory alignment
-      float *magsq= (float *)__builtin_assume_aligned(d_scratch_magsq, MEM_ALIGNMENT);
-
-      for(int io_idx= 0; io_idx<noutput_items; io_idx+= 64) {
-        volk_32fc_magnitude_squared_32f(magsq,
-                                        &in_corr[io_idx],
-                                        64);
-
-        // Bitmasks that indicate magsq being: */
-        uint64_t oh= 0; // over the high threshold
-        uint64_t ol= 0; // over the low threshold
-
-        for(int i=0; i<64; i++) {
-          oh= (oh << 1) | (magsq[i] > d_thres_high_sq);
-          ol= (ol << 1) | (magsq[i] > d_thres_low_sq);
-        }
-
-        // Take last inside/outside state from last round
-        d_inside_carry<<= 63;
-        uint64_t inside= d_inside_carry;
-
-        /* Generate an inside peak/outside peak bitmask
-         * from the over threshold/under threshold bitmasks */
-        for(int i=0; i<64; i++) {
-          register uint64_t sr= (inside >> 1) | inside;
-          inside= (sr & ol) | oh;
-        }
-
-        register uint64_t delayed= (inside >> 1) | d_inside_carry;
-
-        // Store inside/outside state for next round
-        d_inside_carry= inside;
-
-        uint64_t rising=   inside & ~delayed;
-        uint64_t falling= ~inside &  delayed;
-
-        /* Only run the tag setting code when there is
-         * a rising or falling edge in the current window */
-        if(rising || falling) {
-          for(int bidx=0; bidx<64; bidx++) {
-            if(rising & (1L << 63)) {
-              // Start of peak
-
-              d_peak_start_abs= nitems_read(0) + (io_idx + bidx);
-            }
-
-            if(falling & (1L << 63)) {
-              // End of peak
-
-              // Calculate the peak indices
-              int peak_start= (int64_t)d_peak_start_abs - (int64_t)nitems_read(0);
-              int peak_end= io_idx + bidx;
-
-              // Make sure peak_start is not outside the history
-              peak_start= std::max(peak_start, -d_lookahead);
-
-              // Find the index of maximum correlation
-              int32_t max_idx= 0;
-              volk_32fc_index_max_32u((uint32_t *)&max_idx,
-                                      (gr_complex *)&in_corr[peak_start],
-                                      peak_end - peak_start);
-
-              // Calculate meta-info
-              gr_complex corr= in_corr[peak_start + max_idx];
-              float corr_mag= std::abs(corr);
-
-              gr_complex rot_per_sym= std::pow(corr, 1.0f / d_seq_len);
-              rot_per_sym/= std::abs(rot_per_sym);
-
-
-              pmt::pmt_t info= pmt::make_dict();
-              info= pmt::dict_add(info,
-                                  pmt::mp("sc_corr_power"),
-                                  pmt::from_double(corr_mag));
-
-              info= pmt::dict_add(info,
-                                  pmt::mp("sc_rot"),
-                                  pmt::from_complex(rot_per_sym));
-
-              info= pmt::dict_add(info,
-                                  pmt::mp("sc_idx"),
-                                  pmt::from_uint64(d_peak_id));
-
-              uint64_t tag_pos= max_idx + peak_start + d_lookahead + nitems_read(0);
-
-              add_item_tag(0, tag_pos,
-                           pmt::mp("preamble_start"),
-                           info);
-
-              d_peak_id++;
-            }
-
-            rising<<= 1;
-            falling<<= 1;
-          }
-        }
-      }
-
       /* This block delays by d_lookahead samples */
       memcpy(out_pass, &in_pass[-d_lookahead], sizeof(gr_complex) * noutput_items);
       memcpy(out_corr, &in_corr[-d_lookahead], sizeof(gr_complex) * noutput_items);
 
+      for(int io_idx= 0; io_idx<noutput_items; io_idx++) {
+        gr_complex corr= in_corr[io_idx];
+        float power_sq= std::norm(corr);
+
+        /* check if we left the peak with the current sample */
+        if(d_peak.am_inside && (power_sq < d_thres_low_sq)) {
+          d_peak.am_inside= false;
+
+          float corr_power= std::sqrt(d_peak.corr_pw_sq);
+          gr_complex rot_per_sym= std::pow(d_peak.corr, 1.0f / d_seq_len);
+          rot_per_sym/= std::abs(rot_per_sym);
+
+          pmt::pmt_t info= pmt::make_dict();
+          info= pmt::dict_add(info,
+                              pmt::mp("sc_corr_power"),
+                              pmt::from_double(corr_power));
+
+          info= pmt::dict_add(info,
+                              pmt::mp("sc_rot"),
+                              pmt::from_complex(rot_per_sym));
+
+          info= pmt::dict_add(info,
+                              pmt::mp("sc_idx"),
+                              pmt::from_uint64(d_peak.id));
+
+          add_item_tag(0, d_peak.abs_idx,
+                       pmt::mp("preamble_start"),
+                       info);
+
+          d_peak.id++;
+        }
+
+        /* check if we entered the peak with the current sample */
+        if(!d_peak.am_inside && (power_sq > d_thres_high_sq)) {
+          d_peak.am_inside= true;
+          d_peak.corr_pw_sq= 0;
+        }
+
+        if(d_peak.am_inside && (d_peak.corr_pw_sq < power_sq)) {
+          d_peak.abs_idx= nitems_read(0) + io_idx + d_lookahead;
+          d_peak.corr= corr;
+          d_peak.corr_pw_sq= power_sq;
+        }
+      }
+
       return noutput_items;
     }
+
   }
 }
