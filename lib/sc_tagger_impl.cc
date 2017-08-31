@@ -95,8 +95,8 @@ namespace gr {
         uint64_t ol= 0; // over the low threshold
 
         for(int i=0; i<64; i++) {
-          oh&= (uint64_t)(magsq[i] > d_thres_high_sq) << i;
-          ol&= (uint64_t)(magsq[i] > d_thres_low_sq) << i;
+          oh|= (uint64_t)(magsq[i] > d_thres_high_sq) << i;
+          ol|= (uint64_t)(magsq[i] > d_thres_low_sq) << i;
         }
 
         // Take last inside/outside state from last round
