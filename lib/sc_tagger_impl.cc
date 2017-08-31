@@ -80,14 +80,14 @@ namespace gr {
       const gr_complex *in_corr = &in_corr_history[history()];
 
       // Make sure noutput_items is a multiple of 64
-      noutput_items= ((noutput_items + 64 - 1) / 64) * 64;
+      noutput_items= (noutput_items / 64) * 64;
 
       // Allow GCC to make optimizations based on memory alignment
       float *magsq= (float *)__builtin_assume_aligned(d_scratch_magsq, MEM_ALIGNMENT);
 
       for(int io_idx= 0; io_idx<noutput_items; io_idx+= 64) {
         volk_32fc_magnitude_squared_32f(magsq,
-                                        &in_corr_history[io_idx],
+                                        &in_corr[io_idx],
                                         64);
 
         // Bitmasks that indicate magsq being: */
@@ -95,8 +95,8 @@ namespace gr {
         uint64_t ol= 0; // over the low threshold
 
         for(int i=0; i<64; i++) {
-          oh&= (uint64_t)(magsq[io_idx + i] > d_thres_high_sq) << i;
-          ol&= (uint64_t)(magsq[io_idx + i] > d_thres_low_sq) << i;
+          oh&= (uint64_t)(magsq[i] > d_thres_high_sq) << i;
+          ol&= (uint64_t)(magsq[i] > d_thres_low_sq) << i;
         }
 
         // Take last inside/outside state from last round
@@ -164,7 +164,6 @@ namespace gr {
               info= pmt::dict_add(info,
                                   pmt::mp("sc_idx"),
                                   pmt::from_uint64(d_peak_id));
-
 
               uint64_t tag_pos= max_idx + peak_start + d_lookahead + nitems_read(0);
 
