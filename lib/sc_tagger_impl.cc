@@ -118,6 +118,15 @@ namespace gr {
         uint64_t rising=   inside & ~delayed;
         uint64_t falling= ~inside &  delayed;
 
+        printf("--\n");
+        printf(" oh: %llx\n", oh);
+        printf(" ol: %llx\n", ol);
+        printf(" is: %llx\n", inside);
+        printf(" de: %llx\n", delayed);
+        printf(" rs: %llx\n", rising);
+        printf(" fl: %llx\n", falling);
+        printf("--\n");
+
         /* Only run the tag setting code when there is
          * a rising or falling edge in the current window */
         if(rising || falling) {
