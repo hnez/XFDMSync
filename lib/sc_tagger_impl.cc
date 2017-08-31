@@ -34,6 +34,19 @@
 namespace gr {
   namespace xfdm_sync {
 
+    void bin_print(char *txt, uint64_t val)
+    {
+      char cval[65];
+      cval[64]= '\0';
+
+      for(int i=0; i<64; i++) {
+        cval[i]= (val & (1L << 63)) ? '#' : '.';
+        val<<= 1;
+      }
+
+      printf(" %s: %s\n", txt, cval);
+    }
+
     sc_tagger::sptr
     sc_tagger::make(float thres_low, float thres_high, int seq_len)
     {
@@ -119,12 +132,12 @@ namespace gr {
         uint64_t falling= ~inside &  delayed;
 
         printf("--\n");
-        printf(" oh: %llx\n", oh);
-        printf(" ol: %llx\n", ol);
-        printf(" is: %llx\n", inside);
-        printf(" de: %llx\n", delayed);
-        printf(" rs: %llx\n", rising);
-        printf(" fl: %llx\n", falling);
+        bin_print("oh", oh);
+        bin_print("ol", ol);
+        bin_print("is", inside);
+        bin_print("de", delayed);
+        bin_print("rs", rising);
+        bin_print("fl", falling);
         printf("--\n");
 
         /* Only run the tag setting code when there is
