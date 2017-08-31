@@ -165,8 +165,7 @@ namespace gr {
           corr_acc+= wc_scratch[i];
           norm_acc+= wn_scratch[i];
 
-          /* norm_acc _should_ only be zero id corr_acc is also zero */
-          out_corr[io_idx + i]= 2.0f * corr_acc / norm_acc;
+          out_corr[io_idx + i]= (norm_acc > 0) ? (2.0f * corr_acc / norm_acc) : 0;
         }
       }
 
