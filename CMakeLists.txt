@@ -77,7 +77,7 @@ if(CMAKE_COMPILER_IS_GNUCXX AND NOT WIN32)
     #http://gcc.gnu.org/wiki/Visibility
     add_definitions(-fvisibility=hidden)
 
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -ffast-math -funsafe-math-optimizations")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -ffast-math -funsafe-math-optimizations -march=native")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wstrict-overflow -Wshadow -fno-strict-aliasing")
 endif()
 
