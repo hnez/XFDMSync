@@ -33,20 +33,6 @@
 
 namespace gr {
   namespace xfdm_sync {
-
-    void bin_print(char *txt, uint64_t val)
-    {
-      char cval[65];
-      cval[64]= '\0';
-
-      for(int i=0; i<64; i++) {
-        cval[i]= (val & (1L << 63)) ? '#' : '.';
-        val<<= 1;
-      }
-
-      printf(" %s: %s\n", txt, cval);
-    }
-
     sc_tagger::sptr
     sc_tagger::make(float thres_low, float thres_high, int seq_len)
     {
@@ -71,7 +57,6 @@ namespace gr {
 
       d_scratch_magsq= (float *)volk_malloc(sizeof(float) * 64,
                                             MEM_ALIGNMENT);
-
     }
 
     sc_tagger_impl::~sc_tagger_impl()
@@ -130,15 +115,6 @@ namespace gr {
 
         uint64_t rising=   inside & ~delayed;
         uint64_t falling= ~inside &  delayed;
-
-        printf("--\n");
-        bin_print("oh", oh);
-        bin_print("ol", ol);
-        bin_print("is", inside);
-        bin_print("de", delayed);
-        bin_print("rs", rising);
-        bin_print("fl", falling);
-        printf("--\n");
 
         /* Only run the tag setting code when there is
          * a rising or falling edge in the current window */
