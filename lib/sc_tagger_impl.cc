@@ -26,6 +26,8 @@
 #include <gnuradio/io_signature.h>
 #include "sc_tagger_impl.h"
 
+#include <immintrin.h>
+
 /* volk_get_alignment can not be evaluated at compile-time.
  * But __builtin_assume_aligned needs an alignment at compile-time.
  * 32 bytes alignment should be correct for SSE and AVX */
@@ -83,6 +85,12 @@ namespace gr {
       // Allow GCC to make optimizations based on memory alignment
       float *magsq= (float *)__builtin_assume_aligned(d_scratch_magsq, MEM_ALIGNMENT);
 
+      __m256 thrl= _mm256_set_ps(d_thres_low_sq, d_thres_low_sq, d_thres_low_sq, d_thres_low_sq,
+                                  d_thres_low_sq, d_thres_low_sq, d_thres_low_sq, d_thres_low_sq);
+
+      __m256 thrh= _mm256_set_ps(d_thres_high_sq, d_thres_high_sq, d_thres_high_sq, d_thres_high_sq,
+                                  d_thres_high_sq, d_thres_high_sq, d_thres_high_sq, d_thres_high_sq);
+
       for(int io_idx= 0; io_idx<noutput_items; io_idx+= 64) {
         volk_32fc_magnitude_squared_32f(magsq,
                                         &in_corr[io_idx],
@@ -92,20 +100,31 @@ namespace gr {
         uint64_t oh= 0; // over the high threshold
         uint64_t ol= 0; // over the low threshold
 
-        for(int i=0; i<64; i++) {
-          oh= (oh << 1) | (magsq[i] > d_thres_high_sq);
-          ol= (ol << 1) | (magsq[i] > d_thres_low_sq);
+        for(int i=0, j=56; i<8; i++, j-=8) {
+          __m256 mag= _mm256_load_ps(&magsq[i*8]);
+
+          __m256 subl= _mm256_sub_ps(thrl, mag);
+          ol|= (uint64_t)(_mm256_movemask_ps(subl) & 0xff) << j;
+
+          __m256 subh= _mm256_sub_ps(thrh, mag);
+          oh|= (uint64_t)(_mm256_movemask_ps(subh) & 0xff) << j;
         }
 
         // Take last inside/outside state from last round
         d_inside_carry<<= 63;
-        uint64_t inside= d_inside_carry;
+        uint64_t inside= d_inside_carry | oh;
 
         /* Generate an inside peak/outside peak bitmask
          * from the over threshold/under threshold bitmasks */
-        for(int i=0; i<64; i++) {
-          register uint64_t sr= (inside >> 1) | inside;
-          inside= (sr & ol) | oh;
+        for(int i=0; i<8; i++) {
+          inside= ((inside >> 1) | inside) & ol;
+          inside= ((inside >> 1) | inside) & ol;
+          inside= ((inside >> 1) | inside) & ol;
+          inside= ((inside >> 1) | inside) & ol;
+          inside= ((inside >> 1) | inside) & ol;
+          inside= ((inside >> 1) | inside) & ol;
+          inside= ((inside >> 1) | inside) & ol;
+          inside= ((inside >> 1) | inside) & ol;
         }
 
         register uint64_t delayed= (inside >> 1) | d_inside_carry;
