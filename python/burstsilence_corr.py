@@ -46,6 +46,7 @@ class burstsilence_corr(gr.hier_block2):
 
         # Connections
         self.connect((self, 0), (self.to_power, 0))
+        self.connect((self, 0), (self.equiv_delay, 0))
 
         self.connect((self.to_power, 0), (self.pw_delay, 0))
         self.connect((self.to_power, 0), (self.sub_sigref, 1))
@@ -54,9 +55,8 @@ class burstsilence_corr(gr.hier_block2):
 
         self.connect((self.sub_sigref, 0), (self.avg, 0))
 
-        self.connect((self.equiv_delay, 0), (self, 0))
-
         self.connect((self.avg, 0), (self.to_complex, 0))
         self.connect((self.dummy_im, 0), (self.to_complex, 1))
 
+        self.connect((self.equiv_delay, 0), (self, 0))
         self.connect((self.to_complex, 0), (self, 1))
