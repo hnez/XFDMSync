@@ -41,6 +41,10 @@ class burstsilence_corr(gr.hier_block2):
         self.sub_sigref = blocks.sub_ff(1)
         self.avg = blocks.moving_average_ff(half_length, 1, 4096)
 
+        self.dummy_im= blocks.null_source(gr.sizeof_float)
+        self.to_complex= blocks.float_to_complex(1)
+
+        # Connections
         self.connect((self, 0), (self.to_power, 0))
 
         self.connect((self.to_power, 0), (self.pw_delay))
@@ -51,4 +55,8 @@ class burstsilence_corr(gr.hier_block2):
         self.connect((self.sub_sigref, 0), (self.avg, 0))
 
         self.connect((self.equiv_delay, 0), (self, 0))
-        self.connect((self.avg, 0), (self, 1))
+
+        self.connect((self.avg, 0), (self.to_complex, 0))
+        self.connect((self.dummy_im, 0), (self.to_complex, 1))
+
+        self.connect((self.to_complex, 0), (self, 1))
