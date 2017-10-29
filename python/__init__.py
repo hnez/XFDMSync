@@ -32,4 +32,5 @@ except ImportError:
 
 # import any pure python here
 from fqsweep_corr import fqsweep_corr
+from burstsilence_corr import burstsilence_corr
 #

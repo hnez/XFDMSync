@@ -31,7 +31,8 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-    fqsweep_corr.py DESTINATION ${GR_PYTHON_DIR}/xfdm_sync
+    fqsweep_corr.py
+    burstsilence_corr.py DESTINATION ${GR_PYTHON_DIR}/xfdm_sync
 )
 
 ########################################################################
@@ -46,3 +47,4 @@ GR_ADD_TEST(qa_sc_tagger ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_sc_
 GR_ADD_TEST(qa_xcorr_tagger ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_xcorr_tagger.py)
 GR_ADD_TEST(qa_frame_gate ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_frame_gate.py)
 GR_ADD_TEST(qa_fqsweep_corr ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_fqsweep_corr.py)
+GR_ADD_TEST(qa_burstsilence_corr ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_burstsilence_corr.py)
