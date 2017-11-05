@@ -72,7 +72,8 @@ class fqsweep_corr(gr.hier_block2):
         self.connect((self.deriv_1_delay, 0), (self.deriv_1_mul, 1))
 
         # average
-        self.connect((self.deriv_1_mul, 0), (self, 1))
+        self.connect((self.deriv_1_mul, 0), (self.avg, 0))
+        self.connect((self.avg, 0), (self, 1))
 
     def gen_despread(self, preamble_length, span):
         freqs= np.linspace(-span, span, preamble_length)
