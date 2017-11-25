@@ -47,7 +47,7 @@ namespace gr {
       d_seq_len(seq_len),
       d_normalize(normalize)
     {
-      set_history(2 * seq_len);
+      set_history(2 * seq_len + 1);
 
       for(int i=0; i<3; i++) {
         d_corr_windows[i]= (gr_complex *)volk_malloc(sizeof(gr_complex) * d_seq_len,
@@ -78,7 +78,7 @@ namespace gr {
 
       /* Elements in the history will be referred to
        * using negative indices */
-      const gr_complex *in= &in_history[history()];
+      const gr_complex *in= &in_history[history() - 1];
 
       /* Output the delayed input stream */
       memcpy(out_pass, &in[-d_seq_len * 2], sizeof(gr_complex) * noutput_items);
