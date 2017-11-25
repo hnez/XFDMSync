@@ -45,7 +45,7 @@ namespace gr {
     {
       set_tag_propagation_policy(TPP_DONT);
 
-      set_history(d_lookahead);
+      set_history(d_lookahead + 1);
 
       d_peak.id= 0;
       d_peak.am_inside= false;
@@ -65,8 +65,8 @@ namespace gr {
       gr_complex *out_pass = (gr_complex *) output_items[0];
       gr_complex *out_corr = (gr_complex *) output_items[1];
 
-      const gr_complex *in_pass = &in_pass_history[history()];
-      const gr_complex *in_corr = &in_corr_history[history()];
+      const gr_complex *in_pass = &in_pass_history[history() - 1];
+      const gr_complex *in_corr = &in_corr_history[history() - 1];
 
       /* This block delays by d_lookahead samples */
       memcpy(out_pass, &in_pass[-d_lookahead], sizeof(gr_complex) * noutput_items);
